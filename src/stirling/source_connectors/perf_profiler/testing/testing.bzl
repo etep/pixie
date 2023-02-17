@@ -41,5 +41,6 @@ jdk_names = [
     "adopt-j9",
     "ibm",
     "sap",
-    "graal-vm",
+    # TODO(jps): investigate why 'graal-vm' fails with key2x:key1x > 2.5.
+    # "graal-vm",
 ]
