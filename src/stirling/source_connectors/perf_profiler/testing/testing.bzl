@@ -41,6 +41,8 @@ jdk_names = [
     "adopt-j9",
     "ibm",
     "sap",
-    # TODO(jps): investigate why 'graal-vm' fails with key2x:key1x > 2.5.
+    # TODO(jps): investigate.
+    # We observed this test case failing on kernel v5.19 with key2x:key1x > 2.5.
+    # The expectation is that key2x:key1x=2 +/- some margin.
     # "graal-vm",
 ]

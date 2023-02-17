@@ -239,7 +239,7 @@ class PerfProfileBPFTest : public ::testing::TestWithParam<std::filesystem::path
       histo_[stack_trace_str] += count;
     }
 
-    // TODO(jps): bring in a 3rd party library for colorization. e.g.:
+    // TODO(jps): bring in a 3rd party library for colorization. e.g., one of the following:
     // https://github.com/agauniyal/rang
     // https://github.com/ikalnytskyi/termcolor
     auto makecolor = [](const auto n) { return absl::StrFormat("\x1b[38;5;$%dm", n); };
