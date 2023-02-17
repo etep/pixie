@@ -53,7 +53,9 @@ pl_cc_test(
         "//src/stirling/source_connectors/perf_profiler/testing/java:graal-vm-aot-test",
     ],
     defines = ['JDK_IMAGE_NAMES=\\"%s\\"' % ",".join(jdk_image_names)],
+    shard_count = 3,
     tags = [
+        "cpu:16",
         "exclusive",
         "requires_bpf",
     ],
