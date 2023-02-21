@@ -20,15 +20,16 @@
 #include <iostream>
 #include <thread>
 
-#include "src/common/base/base.h"
-#include "src/shared/upid/upid.h"
+#include "src/common/fs/fs_wrapper.h"
 #include "src/stirling/source_connectors/perf_profiler/perf_profile_connector.h"
+#include "src/stirling/source_connectors/perf_profiler/pprof/pprof.h"
 #include "src/stirling/source_connectors/perf_profiler/stack_traces_table.h"
 
 using ::px::Status;
 
 DEFINE_uint32(time, 30, "Number of seconds to run the profiler.");
 DEFINE_uint32(pid, 0, "PID to profile. Use default value, -pid 0, to profile all processes.");
+DEFINE_string(pprof_pb_file, "profile.pb", "Location to create pprof pb file.");
 
 namespace px {
 namespace stirling {
@@ -72,14 +73,28 @@ class Profiler {
     return Status::OK();
   }
 
-  Status PrintData() {
-    // This prints a long spew of counts and stack traces.
-    // We will replace this with a pprof proto file writer.
-    // 15x: libc.so;main;foo;bar
-    // 12x: libc.so;main;foo;qux
-    for (const auto& [str, count] : histo_) {
-      LOG(INFO) << count << "x: " << str;
+  Status WritePProfProtoFile() {
+    const uint32_t num_cpus = 1;
+    const auto pprof_profile = CreatePProfProfile(num_cpus, histo_);
+
+    // Create a file.
+    std::ofstream ofs(FLAGS_pprof_pb_file, std::ios_base::out | std::ios_base::binary);
+
+    // Sanity check the file is good.
+    if (!ofs.is_open()) {
+      return error::ResourceUnavailable("Could not create or open file: $0.", FLAGS_pprof_pb_file);
     }
+
+    // Serialize the pprof proto to that file.
+    if (!pprof_profile.SerializeToOstream(&ofs)) {
+      return error::Internal("Failed to serialize to file: $0.", FLAGS_pprof_pb_file);
+    }
+
+    // In case the resulting file is buried inside of the bazel forest, dig up the resulting abs
+    // path and print for user info.
+    PX_ASSIGN_OR_RETURN(const auto abs_path, fs::Absolute(FLAGS_pprof_pb_file));
+    LOG(INFO) << absl::Substitute("Created pprof proto file: $0.", abs_path.string());
+
     return Status::OK();
   }
 
@@ -229,8 +244,8 @@ Status RunProfiler() {
   // Build the stack traces histogram.
   PX_RETURN_IF_ERROR(g_profiler->BuildHistogram());
 
-  // Print the info. We will replace this with a pprof proto file write out.
-  PX_RETURN_IF_ERROR(g_profiler->PrintData());
+  // Write the profile as a pprof proto.
+  PX_RETURN_IF_ERROR(g_profiler->WritePProfProtoFile());
 
   // Cleanup.
   PX_RETURN_IF_ERROR(g_profiler->Stop());
