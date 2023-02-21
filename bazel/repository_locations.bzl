@@ -36,6 +36,12 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/boringssl/" +
                 "archive/7b00d84b025dff0c392c2df5ee8aa6d3c63ad539.tar.gz"],
     ),
+    # Used by the perf profiler to create pprof proto output.
+    com_github_google_pprof = dict(
+        urls = ["https://github.com/google/pprof/archive/5a9e8f65f08f77f42ab2a02f18561033f44da75e.tar.gz"],
+        strip_prefix = "pprof-5a9e8f65f08f77f42ab2a02f18561033f44da75e",
+        sha256 = "2e721ea3f841d0abaad240ce5d5010155544995e225afa2858d49defdceb4dbb",
+    ),
     com_github_antlr_antlr4 = dict(
         urls = ["https://github.com/antlr/antlr4/archive/refs/tags/4.11.1.tar.gz"],
         strip_prefix = "antlr4-4.11.1",
