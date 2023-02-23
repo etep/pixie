@@ -26,55 +26,21 @@ class ProfilerTest {
   // leaf1x and leaf2x and as a result, we were unable to find the expected symbols.
 
   public static long leaf1x() {
-    // leaf1x() counts by 10s, and sums the result. leaf2x() does the same, but counts by 5s.
-    long m = 10;
-
-    // Outer loop iterations. This function will compute its count (by increments of "m") "n" times.
-    long n = 10000;
-
-    // The sum, returned when the function completes.
     long s = 0;
+    long startTime = System.currentTimeMillis();
 
-    for(long i=0; i < n; i++ ) {
-      long k = i % 2 == 0 ? 7 : 11;
-      for(long j=m; j <= n; j += m ) {
-        // We do some silly things here to prevent newer more powerful JVMs from inlining.
-        if( j % m == 0 ) {
-          s += j;
-        }
-        if( k % j == 0 ) {
-          System.out.println(j);
-          System.out.println(k);
-          return j;
-        }
-      }
+    while ((System.curentTimeMillis() - startTime) < 5) {
+      s++;
     }
     return s;
   }
 
   public static long leaf2x() {
-    // leaf2x() counts by 5s, and sums the result. leaf1x() does the same, but counts by 10s.
-    long m = 5;
-
-    // Outer loop iterations. This function will compute its count (by increments of "m") "n" times.
-    long n = 10000;
-
-    // The sum, returned when the function completes.
     long s = 0;
+    long startTime = System.currentTimeMillis();
 
-    for(long i=0; i < n; i++ ) {
-      long k = i % 2 == 0 ? 7 : 11;
-      for(long j=m; j <= n; j += m ) {
-        // We do some silly things here to prevent newer more powerful JVMs from inlining.
-        if( j % m == 0 ) {
-          s += j;
-        }
-        if( k % j == 0 ) {
-          System.out.println(j);
-          System.out.println(k);
-          return j;
-        }
-      }
+    while ((System.curentTimeMillis() - startTime) < 10) {
+      s++;
     }
     return s;
   }
