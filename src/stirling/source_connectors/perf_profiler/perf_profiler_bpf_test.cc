@@ -87,6 +87,30 @@ std::filesystem::path BazelJavaTestAppPath(const std::string_view app_name) {
   return bazel_app_path;
 }
 
+absl::flat_hash_map<std::string, uint64_t> ShaveToLeafSymbol(
+  const absl::flat_hash_map<std::string, uint64_t>& stack_trace_histo,
+  const std::string_view leaf
+  ) {
+  absl::flat_hash_map<std::string, uint64_t> leaf_histo;
+
+  for (const auto& [stack_trace_str, count] : stack_trace_histo) {
+    const std::vector<std::string_view> symbols = absl::StrSplit(stack_trace_str, ";");
+    auto iter = symbols.end();
+    bool found = false;
+    while(iter != symbols.begin()) {
+      iter--;
+      if( *iter == leaf ) {
+        found = true;
+        break;
+      }
+    }
+
+    const auto leaf_syms = absl::StrJoin(symbols.begin(), found ? iter : symbols.end(), ";");
+    leaf_histo[leaf_syms] += count;
+  }
+  return leaf_histo;
+}
+
 absl::flat_hash_map<std::string, uint64_t> KeepNLeafSyms(
     const uint64_t n, const absl::flat_hash_map<std::string, uint64_t>& stack_trace_histo) {
   absl::flat_hash_map<std::string, uint64_t> leaf_histo;
@@ -472,8 +496,10 @@ TEST_F(PerfProfileBPFTest, GraalVM_AOT_Test) {
   // Pull the data from the perf profile connector into this test case.
   ASSERT_NO_FATAL_FAILURE(ConsumeRecords());
 
+  const auto histox = ShaveToLeafSymbol(histo_, key1x);
+  const auto histoy = ShaveToLeafSymbol(histox, key2x);
   ASSERT_NO_FATAL_FAILURE(
-      CheckExpectedCounts(KeepNLeafSyms(1, histo_), kNumSubProcs, t_elapsed, key1x, key2x));
+      CheckExpectedCounts(KeepNLeafSyms(1, histoy), kNumSubProcs, t_elapsed, key1x, key2x));
 }
 
 TEST_P(PerfProfileBPFTest, PerfProfilerJavaTest) {
@@ -497,8 +523,10 @@ TEST_P(PerfProfileBPFTest, PerfProfilerJavaTest) {
   // Pull the data from the perf profile connector into this test case.
   ASSERT_NO_FATAL_FAILURE(ConsumeRecords());
 
+  const auto histox = ShaveToLeafSymbol(histo_, key1x);
+  const auto histoy = ShaveToLeafSymbol(histox, key2x);
   ASSERT_NO_FATAL_FAILURE(
-      CheckExpectedCounts(KeepNLeafSyms(1, histo_), kNumSubProcs, t_elapsed, key1x, key2x));
+      CheckExpectedCounts(KeepNLeafSyms(1, histoy), kNumSubProcs, t_elapsed, key1x, key2x));
 
   // Now we will test agent cleanup, specifically whether the aritfacts directory is removed.
   // We will construct a list of artifacts paths that we expect,

@@ -29,7 +29,7 @@ class ProfilerTest {
     long s = 0;
     long startTime = System.currentTimeMillis();
 
-    while ((System.curentTimeMillis() - startTime) < 5) {
+    while ((System.currentTimeMillis() - startTime) < 5) {
       s++;
     }
     return s;
@@ -39,7 +39,7 @@ class ProfilerTest {
     long s = 0;
     long startTime = System.currentTimeMillis();
 
-    while ((System.curentTimeMillis() - startTime) < 10) {
+    while ((System.currentTimeMillis() - startTime) < 10) {
       s++;
     }
     return s;
