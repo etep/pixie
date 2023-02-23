@@ -36,6 +36,7 @@
 #include "src/stirling/source_connectors/perf_profiler/symbolizers/java_symbolizer.h"
 #include "src/stirling/source_connectors/perf_profiler/testing/testing.h"
 #include "src/stirling/testing/common.h"
+#include "src/stirling/source_connectors/perf_profiler/pprof/pprof.h"
 
 DEFINE_uint32(test_run_time, 30, "Number of seconds to run the test.");
 DEFINE_string(test_java_image_names, JDK_IMAGE_NAMES,
@@ -44,6 +45,7 @@ DECLARE_bool(stirling_profiler_java_symbols);
 DECLARE_string(stirling_profiler_java_agent_libs);
 DECLARE_uint32(stirling_profiler_table_update_period_seconds);
 DECLARE_uint32(stirling_profiler_stack_trace_sample_period_ms);
+DEFINE_string(pprof_pb_file, "/home/jps/profile.pb", "Location to create pprof pb file.");
 
 namespace px {
 namespace stirling {
@@ -100,6 +102,7 @@ absl::flat_hash_map<std::string, uint64_t> ShaveToLeafSymbol(
     while(iter != symbols.begin()) {
       iter--;
       if( *iter == leaf ) {
+        iter++;
         found = true;
         break;
       }
@@ -128,6 +131,32 @@ absl::flat_hash_map<std::string, uint64_t> KeepNLeafSyms(
 }
 
 }  // namespace
+
+template <typename H>
+Status WritePProfProtoFile(const H& histo) {
+  const uint32_t num_cpus = 4;
+  const auto pprof_profile = CreatePProfProfile(num_cpus, histo);
+
+  // Create a file.
+  std::ofstream ofs(FLAGS_pprof_pb_file, std::ios_base::out | std::ios_base::binary);
+
+  // Sanity check the file is good.
+  if (!ofs.is_open()) {
+    return error::ResourceUnavailable("Could not create or open file: $0.", FLAGS_pprof_pb_file);
+  }
+
+  // Serialize the pprof proto to that file.
+  if (!pprof_profile.SerializeToOstream(&ofs)) {
+    return error::Internal("Failed to serialize to file: $0.", FLAGS_pprof_pb_file);
+  }
+
+  // In case the resulting file is buried inside of the bazel forest, dig up the resulting abs
+  // path and print for user info.
+  PX_ASSIGN_OR_RETURN(const auto abs_path, fs::Absolute(FLAGS_pprof_pb_file));
+  LOG(INFO) << absl::Substitute("Created pprof proto file: $0.", abs_path.string());
+
+  return Status::OK();
+}
 
 class PerfProfilerTestSubProcesses {
  public:
@@ -523,6 +552,7 @@ TEST_P(PerfProfileBPFTest, PerfProfilerJavaTest) {
   // Pull the data from the perf profile connector into this test case.
   ASSERT_NO_FATAL_FAILURE(ConsumeRecords());
 
+  PX_UNUSED(WritePProfProtoFile(histo_));
   const auto histox = ShaveToLeafSymbol(histo_, key1x);
   const auto histoy = ShaveToLeafSymbol(histox, key2x);
   ASSERT_NO_FATAL_FAILURE(
