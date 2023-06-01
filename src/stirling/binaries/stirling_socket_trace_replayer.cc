@@ -39,20 +39,13 @@ DECLARE_uint32(stirling_profiler_stack_trace_sample_period_ms);
 namespace px {
 namespace stirling {
 
-class SocketTracerRecorder : public UnitConnector<SocketTraceConnector> {
- public:
-  Status WritePProf() {
-    bpf_tools::BCCWrapper::GetInstance().WriteProto();
-    return Status::OK();
-  }
-
- private:
+class SocketTracerReplayer : public UnitConnector<SocketTraceConnector> {
 };
 
 }  // namespace stirling
 }  // namespace px
 
-std::unique_ptr<px::stirling::SocketTracerRecorder> g_socket_tracer;
+std::unique_ptr<px::stirling::SocketTracerReplayer> g_socket_tracer;
 
 void SignalHandler(int signum) {
   std::cerr << "\n\nStopping, might take a few seconds ..." << std::endl;
@@ -117,12 +110,6 @@ Status RunSocketTracer() {
     // data_tables.push_back(mgr->data_table());
     info_class_mgrs_.push_back(std::move(mgr));
   }
-  // stirlingpb::InfoClass info_class_proto;
-  //
-  // info_class_proto.mutable_schema()->CopyFrom(schema_.ToProto());
-  // info_class_proto.set_id(id());
-  //
-  // return info_class_proto;
   //////////////////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////////////////
   // Get a publish proto message to subscribe from.
@@ -131,9 +118,7 @@ Status RunSocketTracer() {
   px::stirling::IndexPublication(publish_pb, &g_table_info_map);
   //////////////////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////////////////
-  // PopulatePublishProto(publish_pb, info_class_mgrs_);
-  //////////////////////////////////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////////////////////////////////
+
   PX_RETURN_IF_ERROR(g_socket_tracer->RegisterDataPushCallback(StirlingWrapperCallback));
   //////////////////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,14 +126,11 @@ Status RunSocketTracer() {
   // Separate thread to periodically wake up and read the eBPF perf buffer & maps.
   PX_RETURN_IF_ERROR(g_socket_tracer->Start());
 
-  // Collect data for the user specified amount of time.
+  // Run for specified amount of time.
   sleep(FLAGS_time);
 
   // Stop collecting data and do a final read out of eBPF perf buffer & maps.
   PX_RETURN_IF_ERROR(g_socket_tracer->Stop());
-
-  // Write a pprof proto file.
-  PX_RETURN_IF_ERROR(g_socket_tracer->WritePProf());
 
   // Phew. We are outta here.
   return Status::OK();
@@ -164,7 +146,7 @@ int main(int argc, char** argv) {
   px::EnvironmentGuard env_guard(&argc, argv);
 
   // Need to do this after env setup.
-  g_socket_tracer = std::make_unique<px::stirling::SocketTracerRecorder>();
+  g_socket_tracer = std::make_unique<px::stirling::SocketTracerReplayer>();
 
   // Run the profiler (in more detail: setup, collect data, and tear down).
   const auto status = RunSocketTracer();
