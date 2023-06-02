@@ -48,16 +48,27 @@ class SocketTraceBPFTestFixture : public ::testing::Test {
     //               Change this paradigm.
     FLAGS_treat_loopback_as_in_cluster = !EnableClientSideTracing;
 
+    LOG(WARNING) << "SocketTraceBPFTestFixture::SetUp(): [a].";
     auto source_connector = SocketTraceConnector::Create("socket_trace_connector");
 
+    LOG(WARNING) << "SocketTraceBPFTestFixture::SetUp(): [b].";
     source_.reset(dynamic_cast<SocketTraceConnector*>(source_connector.release()));
+
+    LOG(WARNING) << "SocketTraceBPFTestFixture::SetUp(): [c].";
+    source_->SetReplayingMode();
+
+    LOG(WARNING) << "SocketTraceBPFTestFixture::SetUp(): [d].";
     ASSERT_OK(source_->Init());
 
+    LOG(WARNING) << "SocketTraceBPFTestFixture::SetUp(): [e].";
     source_->set_data_tables(data_tables_.tables());
 
     // Cause Uprobes to deploy in a blocking manner.
     // We don't return until the first set of uprobes has successfully deployed.
+    LOG(WARNING) << "SocketTraceBPFTestFixture::SetUp(): [f].";
     RefreshContext(/* blocking_deploy_uprobes */ true);
+
+    LOG(WARNING) << "SocketTraceBPFTestFixture::SetUp(): [g].";
   }
 
   void TearDown() override { ASSERT_OK(source_->Stop()); }

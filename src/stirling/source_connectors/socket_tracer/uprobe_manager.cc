@@ -70,19 +70,12 @@ void UProbeManager::Init(bool enable_http2_tracing, bool disable_self_probing) {
   cfg_enable_http2_tracing_ = enable_http2_tracing;
   cfg_disable_self_probing_ = disable_self_probing;
 
-  openssl_symaddrs_map_ = UserSpaceManagedBPFMap<uint32_t, struct openssl_symaddrs_t>::Create(
-      bcc_, "openssl_symaddrs_map");
-  go_common_symaddrs_map_ = UserSpaceManagedBPFMap<uint32_t, struct go_common_symaddrs_t>::Create(
-      bcc_, "go_common_symaddrs_map");
-  go_http2_symaddrs_map_ = UserSpaceManagedBPFMap<uint32_t, struct go_http2_symaddrs_t>::Create(
-      bcc_, "http2_symaddrs_map");
-  go_tls_symaddrs_map_ = UserSpaceManagedBPFMap<uint32_t, struct go_tls_symaddrs_t>::Create(
-      bcc_, "go_tls_symaddrs_map");
-  node_tlswrap_symaddrs_map_ =
-      UserSpaceManagedBPFMap<uint32_t, struct node_tlswrap_symaddrs_t>::Create(
-          bcc_, "node_tlswrap_symaddrs_map");
-  grpc_c_versions_map_ =
-      UserSpaceManagedBPFMap<uint32_t, uint64_t>::Create(bcc_, "grpc_c_versions");
+  openssl_symaddrs_map_      = WrappedBCCMap<uint32_t, struct openssl_symaddrs_t>::Create(bcc_, "openssl_symaddrs_map");
+  go_common_symaddrs_map_    = WrappedBCCMap<uint32_t, struct go_common_symaddrs_t>::Create(bcc_, "go_common_symaddrs_map");
+  go_http2_symaddrs_map_     = WrappedBCCMap<uint32_t, struct go_http2_symaddrs_t>::Create(bcc_, "http2_symaddrs_map");
+  go_tls_symaddrs_map_       = WrappedBCCMap<uint32_t, struct go_tls_symaddrs_t>::Create(bcc_, "go_tls_symaddrs_map");
+  node_tlswrap_symaddrs_map_ = WrappedBCCMap<uint32_t, struct node_tlswrap_symaddrs_t>::Create(bcc_, "node_tlswrap_symaddrs_map");
+  grpc_c_versions_map_       = WrappedBCCMap<uint32_t, uint64_t>::Create(bcc_, "grpc_c_versions");
 }
 
 void UProbeManager::NotifyMMapEvent(upid_t upid) {
@@ -161,7 +154,7 @@ Status UProbeManager::UpdateOpenSSLSymAddrs(obj_tools::RawFptrManager* fptr_mana
   PX_ASSIGN_OR_RETURN(struct openssl_symaddrs_t symaddrs,
                       OpenSSLSymAddrs(fptr_manager, libcrypto_path, pid));
 
-  openssl_symaddrs_map_->UpdateValue(pid, symaddrs);
+  PX_RETURN_IF_ERROR(openssl_symaddrs_map_->SetValue(pid, symaddrs));
 
   return Status::OK();
 }
@@ -172,7 +165,7 @@ Status UProbeManager::UpdateGoCommonSymAddrs(ElfReader* elf_reader, DwarfReader*
                       GoCommonSymAddrs(elf_reader, dwarf_reader));
 
   for (auto& pid : pids) {
-    go_common_symaddrs_map_->UpdateValue(pid, symaddrs);
+    PX_RETURN_IF_ERROR(go_common_symaddrs_map_->SetValue(pid, symaddrs));
   }
 
   return Status::OK();
@@ -184,7 +177,7 @@ Status UProbeManager::UpdateGoHTTP2SymAddrs(ElfReader* elf_reader, DwarfReader* 
                       GoHTTP2SymAddrs(elf_reader, dwarf_reader));
 
   for (auto& pid : pids) {
-    go_http2_symaddrs_map_->UpdateValue(pid, symaddrs);
+    PX_RETURN_IF_ERROR(go_http2_symaddrs_map_->SetValue(pid, symaddrs));
   }
 
   return Status::OK();
@@ -195,7 +188,7 @@ Status UProbeManager::UpdateGoTLSSymAddrs(ElfReader* elf_reader, DwarfReader* dw
   PX_ASSIGN_OR_RETURN(struct go_tls_symaddrs_t symaddrs, GoTLSSymAddrs(elf_reader, dwarf_reader));
 
   for (auto& pid : pids) {
-    go_tls_symaddrs_map_->UpdateValue(pid, symaddrs);
+    PX_RETURN_IF_ERROR(go_tls_symaddrs_map_->SetValue(pid, symaddrs));
   }
 
   return Status::OK();
@@ -205,7 +198,7 @@ Status UProbeManager::UpdateNodeTLSWrapSymAddrs(int32_t pid, const std::filesyst
                                                 const SemVer& ver) {
   PX_ASSIGN_OR_RETURN(struct node_tlswrap_symaddrs_t symbol_offsets,
                       NodeTLSWrapSymAddrs(node_exe, ver));
-  node_tlswrap_symaddrs_map_->UpdateValue(pid, symbol_offsets);
+  PX_RETURN_IF_ERROR(node_tlswrap_symaddrs_map_->SetValue(pid, symbol_offsets));
   return Status::OK();
 }
 
@@ -534,11 +527,11 @@ std::thread UProbeManager::RunDeployUProbesThread(const absl::flat_hash_set<md::
 
 void UProbeManager::CleanupPIDMaps(const absl::flat_hash_set<md::UPID>& deleted_upids) {
   for (const auto& pid : deleted_upids) {
-    openssl_symaddrs_map_->RemoveValue(pid.pid());
-    go_common_symaddrs_map_->RemoveValue(pid.pid());
-    go_tls_symaddrs_map_->RemoveValue(pid.pid());
-    go_http2_symaddrs_map_->RemoveValue(pid.pid());
-    node_tlswrap_symaddrs_map_->RemoveValue(pid.pid());
+    PX_UNUSED(openssl_symaddrs_map_->RemoveValue(pid.pid()));
+    PX_UNUSED(go_common_symaddrs_map_->RemoveValue(pid.pid()));
+    PX_UNUSED(go_tls_symaddrs_map_->RemoveValue(pid.pid()));
+    PX_UNUSED(go_http2_symaddrs_map_->RemoveValue(pid.pid()));
+    PX_UNUSED(node_tlswrap_symaddrs_map_->RemoveValue(pid.pid()));
   }
 }
 
@@ -677,7 +670,7 @@ StatusOr<int> UProbeManager::AttachGrpcCUProbesOnDynamicPythonLib(uint32_t pid) 
   VLOG(1) << absl::Substitute("Updating gRPC-C version of pid $0 to $1", pid,
                               magic_enum::enum_name(version));
 
-  grpc_c_versions_map_->UpdateValue(pid, version);
+  PX_RETURN_IF_ERROR(grpc_c_versions_map_->SetValue(pid, version));
 
   // Attach the needed probes.
   // This currently works only for non-stripped versions of the shared object.

@@ -127,7 +127,7 @@ class UnitConnector {
     return Status::OK();
   }
 
-  Status Init(absl::flat_hash_set<md::UPID> upids = {}) {
+  Status Init(absl::flat_hash_set<md::UPID> upids = {}, const bool record=false, const bool replay=false) {
     if (upids.size() == 0) {
       // Enter this branch if Init() is called with no arguments (i.e. with a default empty set).
       // ParsePidsFlag() inspects the value in FLAGS_pids to find any pids the user specified
@@ -136,7 +136,13 @@ class UnitConnector {
     }
 
     source_ = T::Create("source_connector");
-
+    if(record) {
+      source_->SetRecordingMode();
+    }
+    if(replay) {
+      source_->SetReplayingMode();
+    }
+    
     // Compile the eBPF program and create eBPF perf buffers and maps as needed.
     PX_RETURN_IF_ERROR(source_->Init());
 

@@ -29,6 +29,8 @@ DECLARE_uint32(stirling_conn_map_cleanup_threshold);
 namespace px {
 namespace stirling {
 
+using px::stirling::bpf_tools::WrappedBCCMap;
+
 // Forward declaration.
 class ConnTrackersManager;
 
@@ -42,9 +44,9 @@ class ConnInfoMapManager {
 
   void CleanupBPFMapLeaks(ConnTrackersManager* conn_trackers_mgr);
 
- private:
-  ebpf::BPFHashTable<uint64_t, struct conn_info_t> conn_info_map_;
-  ebpf::BPFHashTable<uint64_t, uint64_t> conn_disabled_map_;
+  private:
+  std::unique_ptr<WrappedBCCMap<uint64_t, struct conn_info_t>> conn_info_map_;
+  std::unique_ptr<WrappedBCCMap<uint64_t, uint64_t>> conn_disabled_map_;
 
   std::vector<struct conn_id_t> pending_release_queue_;
 

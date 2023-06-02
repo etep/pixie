@@ -162,6 +162,7 @@ namespace stirling {
 using px::system::ProcPath;
 using px::system::ProcPidPath;
 using px::utils::ToJSONString;
+using px::stirling::bpf_tools::WrappedBCCPerCPUArrayTable;
 
 // Most HTTP servers support 8K headers, so we truncate after that.
 // https://stackoverflow.com/questions/686217/maximum-on-http-header-values
@@ -182,12 +183,11 @@ SocketTraceConnector::SocketTraceConnector(std::string_view source_name)
           BuildCounterFamily(openssl_mismatched_fds_metric, openssl_mismatched_fds_help)),
       uprobe_mgr_(this) {
   proc_parser_ = std::make_unique<system::ProcParser>();
-  InitProtocolTransferSpecs();
 }
 
 void SocketTraceConnector::InitProtocolTransferSpecs() {
 #define TRANSFER_STREAM_PROTOCOL(protocol_name) \
-  &SocketTraceConnector::TransferStream<protocols::protocol_name::ProtocolTraits>
+  IsRecording() ? &SocketTraceConnector::TransferStream<protocols::sink::ProtocolTraits> : &SocketTraceConnector::TransferStream<protocols::protocol_name::ProtocolTraits>
 
   // PROTOCOL_LIST: Requires update on new protocols.
 
@@ -354,7 +354,7 @@ void ResizePerfBufferSpecs(std::array<bpf_tools::PerfBufferSpec, N>* perf_buffer
 }
 }  // namespace
 
-auto SocketTraceConnector::InitPerfBufferSpecs() {
+auto SocketTraceConnector::InitPerfBufferSpecs(void * cb_cookie) {
   const size_t ncpus = get_nprocs_conf();
 
   double cpu_scaling_factor = (1 + FLAGS_stirling_socket_tracer_percpu_bw_scaling_factor) /
@@ -382,23 +382,14 @@ auto SocketTraceConnector::InitPerfBufferSpecs() {
 
   auto specs = MakeArray<bpf_tools::PerfBufferSpec>({
       // For data events. The order must be consistent with output tables.
-      {"socket_data_events", HandleDataEvent, HandleDataEventLoss, kTargetDataBufferSize,
-       PerfBufferSizeCategory::kData},
-      // For non-data events. Must not mix with the above perf buffers for data events.
-      {"socket_control_events", HandleControlEvent, HandleControlEventLoss,
-       kTargetControlBufferSize, PerfBufferSizeCategory::kControl},
-      {"conn_stats_events", HandleConnStatsEvent, HandleConnStatsEventLoss,
-       kTargetControlBufferSize, PerfBufferSizeCategory::kControl},
-      {"mmap_events", HandleMMapEvent, HandleMMapEventLoss, kTargetControlBufferSize / 10,
-       PerfBufferSizeCategory::kControl},
-      {"go_grpc_events", HandleHTTP2Event, HandleHTTP2EventLoss, kTargetDataBufferSize,
-       PerfBufferSizeCategory::kData},
-      {"grpc_c_events", HandleGrpcCEvent, HandleGrpcCDataLoss, kTargetDataBufferSize,
-       PerfBufferSizeCategory::kData},
-      {"grpc_c_header_events", HandleGrpcCHeaderEvent, HandleGrpcCHeaderDataLoss,
-       kTargetDataBufferSize, PerfBufferSizeCategory::kData},
-      {"grpc_c_close_events", HandleGrpcCCloseEvent, HandleGrpcCCloseDataLoss,
-       kTargetDataBufferSize, PerfBufferSizeCategory::kData},
+      {"socket_data_events", HandleDataEvent, HandleDataEventLoss, kTargetDataBufferSize, PerfBufferSizeCategory::kData, cb_cookie},
+      {"socket_control_events", HandleControlEvent, HandleControlEventLoss, kTargetControlBufferSize, PerfBufferSizeCategory::kControl, cb_cookie},
+      {"conn_stats_events", HandleConnStatsEvent, HandleConnStatsEventLoss, kTargetControlBufferSize, PerfBufferSizeCategory::kControl, cb_cookie},
+      {"mmap_events", HandleMMapEvent, HandleMMapEventLoss, kTargetControlBufferSize / 10, PerfBufferSizeCategory::kControl, cb_cookie},
+      {"go_grpc_events", HandleHTTP2Event, HandleHTTP2EventLoss, kTargetDataBufferSize, PerfBufferSizeCategory::kData, cb_cookie},
+      {"grpc_c_events", HandleGrpcCEvent, HandleGrpcCDataLoss, kTargetDataBufferSize, PerfBufferSizeCategory::kData, cb_cookie},
+      {"grpc_c_header_events", HandleGrpcCHeaderEvent, HandleGrpcCHeaderDataLoss, kTargetDataBufferSize, PerfBufferSizeCategory::kData, cb_cookie},
+      {"grpc_c_close_events", HandleGrpcCCloseEvent, HandleGrpcCCloseDataLoss, kTargetDataBufferSize, PerfBufferSizeCategory::kData, cb_cookie},
   });
   ResizePerfBufferSpecs(&specs, category_maximums);
   return specs;
@@ -427,29 +418,36 @@ Status SocketTraceConnector::InitBPF() {
   LOG(INFO) << absl::Substitute("Number of kprobes deployed = $0", kProbeSpecs.size());
   LOG(INFO) << "Probes successfully deployed.";
 
-  const auto kPerfBufferSpecs = InitPerfBufferSpecs();
-  PX_RETURN_IF_ERROR(OpenPerfBuffers(kPerfBufferSpecs, this));
+  const auto kPerfBufferSpecs = InitPerfBufferSpecs(this);
+  PX_RETURN_IF_ERROR(OpenPerfBuffers(kPerfBufferSpecs));
   LOG(INFO) << absl::Substitute("Number of perf buffers opened = $0", kPerfBufferSpecs.size());
-
+  LOG(WARNING) << "SocketTraceConnector::InitBPF(): [a].";
+  
   // Set trace role to BPF probes.
   for (const auto& p : magic_enum::enum_values<traffic_protocol_t>()) {
+    // LOG(WARNING) << "SocketTraceConnector::InitBPF(): [b].";
     if (protocol_transfer_specs_[p].enabled) {
       uint64_t role_mask = 0;
       for (auto role : protocol_transfer_specs_[p].trace_roles) {
         role_mask |= role;
       }
+      // LOG(WARNING) << "SocketTraceConnector::InitBPF(): [c].";
       PX_RETURN_IF_ERROR(UpdateBPFProtocolTraceRole(p, role_mask));
     }
   }
 
+  // LOG(WARNING) << "SocketTraceConnector::InitBPF(): [d].";
   PX_RETURN_IF_ERROR(TestOnlySetTargetPID());
   if (FLAGS_stirling_disable_self_tracing) {
+    // LOG(WARNING) << "SocketTraceConnector::InitBPF(): [e].";
     PX_RETURN_IF_ERROR(DisableSelfTracing());
   }
   if (!FLAGS_socket_trace_data_events_output_path.empty()) {
+    // LOG(WARNING) << "SocketTraceConnector::InitBPF(): [f].";
     SetupOutput(FLAGS_socket_trace_data_events_output_path);
   }
 
+  // LOG(WARNING) << "SocketTraceConnector::InitBPF(): [g].";
   return Status::OK();
 }
 
@@ -468,11 +466,15 @@ void CheckDebugFlags() {
 }  // namespace
 
 Status SocketTraceConnector::InitImpl() {
+  LOG(WARNING) << "SocketTraceConnector::InitImpl(): [a].";
+  InitProtocolTransferSpecs();
   CheckDebugFlags();
 
+  //LOG(WARNING) << "SocketTraceConnector::InitImpl(): [b].";
   sampling_freq_mgr_.set_period(kSamplingPeriod);
   push_freq_mgr_.set_period(kPushPeriod);
 
+  //LOG(WARNING) << "SocketTraceConnector::InitImpl(): [c].";
   constexpr uint64_t kNanosPerSecond = 1000 * 1000 * 1000;
   if (kNanosPerSecond % sysconfig_.KernelTicksPerSecond() != 0) {
     return error::Internal(
@@ -480,27 +482,29 @@ Status SocketTraceConnector::InitImpl() {
         "timestamps in a way that matches how /proc/stat does it");
   }
 
+  LOG(WARNING) << "SocketTraceConnector::InitImpl(): [d].";
   PX_RETURN_IF_ERROR(InitBPF());
 
-  auto s = system::SocketInfoManager::Create(
-      ProcPath(), system::kTCPEstablishedState | system::kTCPListeningState);
+  //LOG(WARNING) << "SocketTraceConnector::InitImpl(): [e].";
+  auto s = system::SocketInfoManager::Create(ProcPath(), system::kTCPEstablishedState | system::kTCPListeningState);
+  //LOG(WARNING) << "SocketTraceConnector::InitImpl(): [f].";
   if (!s.ok()) {
     LOG(WARNING) << absl::Substitute("Failed to set up SocketInfoManager. Message: $0", s.msg());
   } else {
+    //LOG(WARNING) << "SocketTraceConnector::InitImpl(): [g].";
     socket_info_mgr_ = s.ConsumeValueOrDie();
   }
 
+  //LOG(WARNING) << "SocketTraceConnector::InitImpl(): [h].";
   conn_info_map_mgr_ = std::make_shared<ConnInfoMapManager>(this);
+  //LOG(WARNING) << "SocketTraceConnector::InitImpl(): [i].";
   ConnTracker::SetConnInfoMapManager(conn_info_map_mgr_);
 
-  uprobe_mgr_.Init(protocol_transfer_specs_[kProtocolHTTP2].enabled,
-                   FLAGS_stirling_disable_self_tracing);
+  LOG(WARNING) << "SocketTraceConnector::InitImpl(): [j].";
+  uprobe_mgr_.Init(protocol_transfer_specs_[kProtocolHTTP2].enabled, FLAGS_stirling_disable_self_tracing);
 
-  openssl_trace_state_ =
-      std::make_unique<ebpf::BPFArrayTable<int>>(GetArrayTable<int>("openssl_trace_state"));
-  openssl_trace_state_debug_ =
-      std::make_unique<ebpf::BPFHashTable<uint32_t, struct openssl_trace_state_debug_t>>(
-          GetHashTable<uint32_t, openssl_trace_state_debug_t>("openssl_trace_state_debug"));
+  openssl_trace_state_ = WrappedBCCArrayTable<int>::Create(this, "openssl_trace_state");
+  openssl_trace_state_debug_ = WrappedBCCMap<uint32_t, struct openssl_trace_state_debug_t>::Create(this,"openssl_trace_state_debug");
 
   return Status::OK();
 }
@@ -560,7 +564,7 @@ std::string DumpContext(ConnectorContext* ctx) {
 
 template <typename TBPFTableKey, typename TBPFTableVal>
 std::string BPFMapInfo(bpf_tools::BCCWrapper* bcc, std::string_view name) {
-  auto map = bcc->GetHashTable<TBPFTableKey, TBPFTableVal>(name.data());
+  auto map = bcc->bpf_.get_hash_table<TBPFTableKey, TBPFTableVal>(name.data());
   size_t map_size = map.get_table_offline().size();
   if (1.0 * map_size / map.capacity() > 0.9) {
     LOG(WARNING) << absl::Substitute("BPF Table $0 is nearly at capacity [size=$0 capacity=$1]",
@@ -593,6 +597,7 @@ std::string BPFMapsInfo(bpf_tools::BCCWrapper* bcc) {
 }  // namespace
 
 void SocketTraceConnector::UpdateCommonState(ConnectorContext* ctx) {
+  LOG(WARNING) << "SocketTraceConnector::UpdateCommonState().";
   // Since events may be pushed into the perf buffer while reading it,
   // we establish a cutoff time before draining the perf buffer.
   // Note: We use AdjustedSteadyClockNowNS() instead of CurrentTimeNS()
@@ -650,15 +655,15 @@ void SocketTraceConnector::CheckTracerState() {
     return;
   }
 
-  int error_code;
-  openssl_trace_state_->get_value(kOpenSSLTraceStatusIdx, error_code);
+  auto s = openssl_trace_state_->GetValue(kOpenSSLTraceStatusIdx);
+  const int error_code = s.ok() ? s.ConsumeValueOrDie() : 0;
 
   if (error_code == kOpenSSLMismatchedFDsDetected) {
     openssl_trace_mismatched_fds_counter_family_.Add({{"name", openssl_mismatched_fds_metric}})
         .Increment();
 
     // Record the offending applications and clear the BPF hash in the process.
-    auto table = openssl_trace_state_debug_->get_table_offline(true);
+    auto table = openssl_trace_state_debug_->GetTableOffline(true);
     for (auto& entry : table) {
       struct openssl_trace_state_debug_t debug = std::get<1>(entry);
 
@@ -672,7 +677,7 @@ void SocketTraceConnector::CheckTracerState() {
   // Reset the BPF map to its default value so that each occurrence
   // can be detected.
   if (error_code != kOpenSSLTraceOk) {
-    openssl_trace_state_->update_value(kOpenSSLTraceStatusIdx, kOpenSSLTraceOk);
+    PX_UNUSED(openssl_trace_state_->SetValue(kOpenSSLTraceStatusIdx, kOpenSSLTraceOk));
   }
 }
 
@@ -737,6 +742,7 @@ void SocketTraceConnector::TransferDataImpl(ConnectorContext* ctx) {
                                    socket_info_mgr_.get());
 
     if (transfer_spec.transfer_fn != nullptr) {
+      //LOG(WARNING) << "calling: transfer_spec.transfer_fn.";
       transfer_spec.transfer_fn(*this, ctx, conn_tracker, data_table);
     } else {
       // If there's no transfer function, then the tracker should not be holding any data.
@@ -755,32 +761,30 @@ void SocketTraceConnector::TransferDataImpl(ConnectorContext* ctx) {
   pids_to_trace_disable_.clear();
 }
 
-Status SocketTraceConnector::UpdateBPFProtocolTraceRole(traffic_protocol_t protocol,
-                                                        uint64_t role_mask) {
-  auto control_map_handle = GetPerCPUArrayTable<uint64_t>(kControlMapName);
-  return bpf_tools::UpdatePerCPUArrayValue(static_cast<int>(protocol), role_mask,
-                                           &control_map_handle);
+Status SocketTraceConnector::UpdateBPFProtocolTraceRole(traffic_protocol_t protocol, uint64_t role_mask) {
+  //LOG(WARNING) << "SocketTraceConnector::UpdateBPFProtocolTraceRole(): [a].";
+  auto control_map_handle = WrappedBCCPerCPUArrayTable<uint64_t>::Create(this, kControlMapName);
+  //LOG(WARNING) << "SocketTraceConnector::UpdateBPFProtocolTraceRole(): [b].";
+  return control_map_handle->SetValues(static_cast<uint32_t>(protocol), role_mask);
+  // return Status::OK();
+  // // return bpf_tools::UpdatePerCPUArrayValue(static_cast<int>(protocol), role_mask, &control_map_handle);
 }
 
 Status SocketTraceConnector::TestOnlySetTargetPID() {
-  int64_t pid = FLAGS_test_only_socket_trace_target_pid;
+  const int64_t pid = FLAGS_test_only_socket_trace_target_pid;
   if (pid != kTraceAllTGIDs) {
-    LOG(WARNING) << absl::Substitute(
-        "Target trace PID set to pid=$0, will force BPF to ignore event filtering and "
-        "submit events of this PID to userspace",
-        pid);
-    LOG(WARNING) << absl::Substitute(
-        "Enable CONN_TRACE for pid=$0 following --test_only_socket_trace_target_pid", pid);
+    LOG(WARNING) << absl::Substitute("Target trace PID set to pid=$0, will force BPF to ignore event filtering and " "submit events of this PID to userspace", pid);
+    LOG(WARNING) << absl::Substitute("Enable CONN_TRACE for pid=$0 following --test_only_socket_trace_target_pid", pid);
     FLAGS_stirling_conn_trace_pid = pid;
   }
-  auto control_map_handle = GetPerCPUArrayTable<int64_t>(kControlValuesArrayName);
-  return bpf_tools::UpdatePerCPUArrayValue(kTargetTGIDIndex, pid, &control_map_handle);
+  auto control_map_handle = WrappedBCCPerCPUArrayTable<int64_t>::Create(this, kControlValuesArrayName);
+  return control_map_handle->SetValues(kTargetTGIDIndex, pid);
 }
 
 Status SocketTraceConnector::DisableSelfTracing() {
-  auto control_map_handle = GetPerCPUArrayTable<int64_t>(kControlValuesArrayName);
-  int64_t self_pid = getpid();
-  return bpf_tools::UpdatePerCPUArrayValue(kStirlingTGIDIndex, self_pid, &control_map_handle);
+  auto control_map_handle = WrappedBCCPerCPUArrayTable<int64_t>::Create(this, kControlValuesArrayName);
+  const int64_t self_pid = getpid();
+  return control_map_handle->SetValues(kStirlingTGIDIndex, self_pid);
 }
 
 //-----------------------------------------------------------------------------
@@ -1172,6 +1176,52 @@ std::string PXInfoString(const ConnTracker& conn_tracker, const TRecordType& rec
 }  // namespace
 
 template <>
+void SocketTraceConnector::AppendMessage(ConnectorContext*, const ConnTracker&,
+                                         protocols::sink::Record, DataTable*) {
+  // protocols::sink::Message& req_message = record.req;
+  // protocols::sink::Message& resp_message = record.resp;
+  // 
+  // // Currently decompresses gzip content, but could handle other transformations too.
+  // // Note that we do this after filtering to avoid burning CPU cycles unnecessarily.
+  // protocols::http::PreProcessMessage(&resp_message);
+  // 
+  // md::UPID upid(ctx->GetASID(), conn_tracker.conn_id().upid.pid,
+  //               conn_tracker.conn_id().upid.start_time_ticks);
+  // 
+  // HTTPContentType content_type = HTTPContentType::kUnknown;
+  // if (protocols::http::IsJSONContent(resp_message)) {
+  //   content_type = HTTPContentType::kJSON;
+  // }
+  // 
+  // DataTable::RecordBuilder<&kHTTPTable> r(data_table, resp_message.timestamp_ns);
+//   r.Append<r.ColIndex("time_")>(resp_message.timestamp_ns);
+//   r.Append<r.ColIndex("upid")>(upid.value());
+//   // Note that there is a string copy here,
+//   // But std::move is not allowed because we re-use conn object.
+//   r.Append<r.ColIndex("remote_addr")>(conn_tracker.remote_endpoint().AddrStr());
+//   r.Append<r.ColIndex("remote_port")>(conn_tracker.remote_endpoint().port());
+//   r.Append<r.ColIndex("trace_role")>(conn_tracker.role());
+//   r.Append<r.ColIndex("major_version")>(1);
+//   r.Append<r.ColIndex("minor_version")>(resp_message.minor_version);
+//   r.Append<r.ColIndex("content_type")>(static_cast<uint64_t>(content_type));
+//   r.Append<r.ColIndex("req_headers")>(ToJSONString(req_message.headers), kMaxHTTPHeadersBytes);
+//   r.Append<r.ColIndex("req_method")>(std::move(req_message.req_method));
+//   r.Append<r.ColIndex("req_path")>(std::move(req_message.req_path));
+//   r.Append<r.ColIndex("req_body_size")>(req_message.body_size);
+//   r.Append<r.ColIndex("req_body")>(std::move(req_message.body), FLAGS_max_body_bytes);
+//   r.Append<r.ColIndex("resp_headers")>(ToJSONString(resp_message.headers), kMaxHTTPHeadersBytes);
+//   r.Append<r.ColIndex("resp_status")>(resp_message.resp_status);
+//   r.Append<r.ColIndex("resp_message")>(std::move(resp_message.resp_message));
+//   r.Append<r.ColIndex("resp_body_size")>(resp_message.body_size);
+//   r.Append<r.ColIndex("resp_body")>(std::move(resp_message.body), FLAGS_max_body_bytes);
+//   r.Append<r.ColIndex("latency")>(
+//       CalculateLatency(req_message.timestamp_ns, resp_message.timestamp_ns));
+// #ifndef NDEBUG
+//   r.Append<r.ColIndex("px_info_")>(PXInfoString(conn_tracker, record));
+// #endif
+}
+
+template <>
 void SocketTraceConnector::AppendMessage(ConnectorContext* ctx, const ConnTracker& conn_tracker,
                                          protocols::http::Record record, DataTable* data_table) {
   protocols::http::Message& req_message = record.req;
@@ -1405,6 +1455,7 @@ void SocketTraceConnector::AppendMessage(ConnectorContext* ctx, const ConnTracke
   md::UPID upid(ctx->GetASID(), conn_tracker.conn_id().upid.pid,
                 conn_tracker.conn_id().upid.start_time_ticks);
   int64_t timestamp_ns = std::max(entry.req.timestamp_ns, entry.resp.timestamp_ns);
+  LOG(WARNING) << "SocketTraceConnector::AppendMessage(), AMQP.";
   DataTable::RecordBuilder<&kAMQPTable> r(data_table, timestamp_ns);
 
   r.Append<r.ColIndex("time_")>(timestamp_ns);
@@ -1584,7 +1635,7 @@ void SocketTraceConnector::TransferStream(ConnectorContext* ctx, ConnTracker* tr
                                           DataTable* data_table) {
   using TFrameType = typename TProtocolTraits::frame_type;
 
-  VLOG(3) << absl::StrCat("Connection\n", DebugString<TProtocolTraits>(*tracker, ""));
+  LOG(WARNING) << absl::StrCat("Connection\n", DebugString<TProtocolTraits>(*tracker, ""));
 
   // Make sure the tracker's frames containers have been properly initialized.
   // This is a nop if the containers are already of the right type.
