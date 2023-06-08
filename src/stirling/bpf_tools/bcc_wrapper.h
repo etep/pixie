@@ -486,21 +486,19 @@ template<typename T> StatusOr<T> ReplayBPFArrayTableGetValueEvent( const std::st
   return value;
 }
 
-template <typename T> class WrappedBCCArrayTable {
-  public:
+template <typename T>
+class WrappedBCCArrayTable : NotCopyMoveable {
+ public:
   using U = ebpf::BPFArrayTable<T>;
+  using S = WrappedBCCArrayTable<T>;
+  public:
 
-  WrappedBCCArrayTable(bpf_tools::BCCWrapper* bcc, const std::string& name) :
-    name_(name),
-    recording_(bcc->IsRecording()),
-    replaying_(bcc->IsReplaying()) {
-    if(!replaying_) {
-      underlying_ = std::make_unique<U>(bcc->bpf_.get_array_table<T>(name_));
+  static WrappedBCCArrayTable<T>& GetInstance(bpf_tools::BCCWrapper* bcc, const std::string& name) {
+    const auto [iter, inserted] = instances_.try_emplace(name, nullptr);
+    if (inserted) {
+      iter->second = std::unique_ptr<S>(new S(bcc, name));
     }
-  }
-
-  static std::unique_ptr<WrappedBCCArrayTable> Create(bpf_tools::BCCWrapper* bcc, const std::string& name) {
-    return std::unique_ptr<WrappedBCCArrayTable>(new WrappedBCCArrayTable(bcc, name));
+    return *instances_[name];
   }
 
   StatusOr<T> GetValue(const uint32_t idx) {
@@ -529,7 +527,17 @@ template <typename T> class WrappedBCCArrayTable {
     return Status::OK();
   }
 
-  private:
+ private:
+  static inline absl::flat_hash_map<std::string, std::unique_ptr<WrappedBCCArrayTable<T> > > instances_;
+  
+  WrappedBCCArrayTable(bpf_tools::BCCWrapper* bcc, const std::string& name) :
+    name_(name),
+    recording_(bcc->IsRecording()),
+    replaying_(bcc->IsReplaying()) {
+    if(!replaying_) {
+      underlying_ = std::make_unique<U>(bcc->bpf_.get_array_table<T>(name_));
+    }
+  }
   const std::string name_;
   const bool recording_;
   const bool replaying_;
