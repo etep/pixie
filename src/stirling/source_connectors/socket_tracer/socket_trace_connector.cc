@@ -1635,7 +1635,7 @@ void SocketTraceConnector::TransferStream(ConnectorContext* ctx, ConnTracker* tr
                                           DataTable* data_table) {
   using TFrameType = typename TProtocolTraits::frame_type;
 
-  LOG(WARNING) << absl::StrCat("Connection\n", DebugString<TProtocolTraits>(*tracker, ""));
+  // LOG(WARNING) << absl::StrCat("Connection\n", DebugString<TProtocolTraits>(*tracker, ""));
 
   // Make sure the tracker's frames containers have been properly initialized.
   // This is a nop if the containers are already of the right type.

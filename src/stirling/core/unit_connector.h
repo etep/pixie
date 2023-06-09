@@ -74,10 +74,17 @@ class UnitConnector {
     return Status::OK();
   }
 
-  Status Start() {
+  Status Start(absl::flat_hash_set<md::UPID> upids={}) {
     // Pedantic, but better than bravely carrying on if something is wrong here.
     PX_RETURN_IF_ERROR(VerifyInitted());
 
+    if (upids.size() == 0) {
+      // The upids set is empty: trace all processes and use automatic context refresh.
+      ctx_ = std::make_unique<EverythingLocalContext>();
+    } else {
+      // The upids set is non-empty: we will trace only processes identified by that set.
+      ctx_ = std::make_unique<StandaloneContext>(upids);
+    }
     if (stopped_) {
       return error::Internal("Already stopped.");
     }

@@ -49,10 +49,19 @@ struct RedisTraceTestCase {
   std::string exp_resp;
 };
 
-class RedisTraceBPFTest : public testing::SocketTraceBPFTestFixtureUC<false, false, true>,
+namespace {
+constexpr bool kRecording = true;
+constexpr bool kReplaying = false;
+}
+
+class RedisTraceBPFTest : public testing::SocketTraceBPFTestFixtureUC<false, kRecording, kReplaying>,
                           public ::testing::WithParamInterface<RedisTraceTestCase> {
  protected:
-  // RedisTraceBPFTest() { PX_CHECK_OK(container_.Run(std::chrono::seconds{150})); }
+  RedisTraceBPFTest() {
+    if (!kReplaying) {
+      PX_CHECK_OK(container_.Run(std::chrono::seconds{150}));
+    }
+  }
 
   RedisContainer container_;
 };
@@ -87,50 +96,96 @@ std::vector<RedisTraceRecord> GetRedisTraceRecords(
 
 // Verifies that batched commands can be traced correctly.
 TEST_F(RedisTraceBPFTest, VerifyBatchedCommands) {
-  // const system::ProcParser proc_parser;
-  // const uint32_t server_pid = container_.process_pid();
-  // ASSERT_OK_AND_ASSIGN(const int64_t server_pid_ts, proc_parser.GetPIDStartTimeTicks(server_pid));
-  ASSERT_OK(source_.Start());
+  if (kReplaying) {
+    ASSERT_OK(source_.Start());
+    sleep(1);
+  }
+  else {
+    const system::ProcParser proc_parser;
+    const uint32_t server_pid = container_.process_pid();
+    ASSERT_OK_AND_ASSIGN(const int64_t server_pid_ts, proc_parser.GetPIDStartTimeTicks(server_pid));
+    ASSERT_OK(source_.Start({{0, server_pid, server_pid_ts}}));
+
+    // NOTE: select 0 must be the last one in order to avoid mess up with the key lookup in the
+    // storage index.
+    constexpr std::string_view kRedisCmds = R"(
+      ping test
+      set foo 100 EX 10 NX
+      expire foo 10000
+      bitcount foo 0 0
+      incr foo
+      append foo xxx
+      get foo
+      mget foo bar
+      sadd myset 1 2 3
+      sscan myset 0 MATCH [a-z]+ COUNT 10
+      scard myset
+      smembers myset
+      hmset fooset f1 100 f2 200
+      hmget fooset f1 f2
+      hget fooset f1
+      hgetall fooset
+      watch foo bar
+      unwatch
+      select 0
+    )";
+
+    RedisClientContainer redis_cli_client;
+    ASSERT_OK_AND_ASSIGN(
+        std::string output,
+        redis_cli_client.Run(
+            std::chrono::seconds{60},
+            {absl::Substitute("--network=container:$0", container_.container_name())},
+            {"bash", "-c", absl::Substitute("echo '$0' | redis-cli", kRedisCmds)}));
+    redis_cli_client.Wait();
+  }
   // ASSERT_OK(source_.ResetConnectorContext({{0, server_pid, server_pid_ts}}));
 
-  // NOTE: select 0 must be the last one in order to avoid mess up with the key lookup in the
-  // storage index.
-  // constexpr std::string_view kRedisCmds = R"(
-  //   ping test
-  //   set foo 100 EX 10 NX
-  //   expire foo 10000
-  //   bitcount foo 0 0
-  //   incr foo
-  //   append foo xxx
-  //   get foo
-  //   mget foo bar
-  //   sadd myset 1 2 3
-  //   sscan myset 0 MATCH [a-z]+ COUNT 10
-  //   scard myset
-  //   smembers myset
-  //   hmset fooset f1 100 f2 200
-  //   hmget fooset f1 f2
-  //   hget fooset f1
-  //   hgetall fooset
-  //   watch foo bar
-  //   unwatch
-  //   select 0
-  // )";
-
-  // RedisClientContainer redis_cli_client;
-  // ASSERT_OK_AND_ASSIGN(
-  //     std::string output,
-  //     redis_cli_client.Run(
-  //         std::chrono::seconds{60},
-  //         {absl::Substitute("--network=container:$0", container_.container_name())},
-  //         {"bash", "-c", absl::Substitute("echo '$0' | redis-cli", kRedisCmds)}));
-  // redis_cli_client.Wait();
-  sleep(1);
   ASSERT_OK(source_.Stop());
   ASSERT_OK_AND_ASSIGN(auto record_batch, source_.ConsumeRecords(kRedisTableNum));
 
   std::vector<RedisTraceRecord> redis_trace_records = GetRedisTraceRecords(record_batch);
 
+  // redis-cli sends a 'command' req to query all available commands from server.
+  // This only appears to happen when piping in a script.
+  // The response is too long to test meaningfully, so we ignore them.
+  // Sometimes this command is not properly traced, so we make this conditional.
+  // TODO(oazizi/yzhao): Figure out why this is not always traced.
+  ASSERT_THAT(redis_trace_records, Not(IsEmpty()));
+  ASSERT_EQ(redis_trace_records.begin()->cmd, "COMMAND");
+  while (redis_trace_records.begin()->cmd == "COMMAND") {
+    LOG(INFO) << "Erasing leading COMMAND record: " << redis_trace_records.front();
+    redis_trace_records.erase(redis_trace_records.begin());
+  }
+
+  EXPECT_THAT(
+      redis_trace_records,
+      ElementsAreArray(
+          {RedisTraceRecord{"PING", R"({"message":"test"})", "test"},
+           RedisTraceRecord{"SET", R"({"key":"foo","value":"100","options":["EX 10","NX"]})", "OK"},
+           RedisTraceRecord{"EXPIRE", R"({"key":"foo","seconds":"10000"})", "1"},
+           RedisTraceRecord{"BITCOUNT", R"(["foo","0","0"])", "3"},
+           RedisTraceRecord{"INCR", R"({"key":"foo"})", "101"},
+           RedisTraceRecord{"APPEND", R"({"key":"foo","value":"xxx"})", "6"},
+           RedisTraceRecord{"GET", R"({"key":"foo"})", "101xxx"},
+           RedisTraceRecord{"MGET", R"({"key":["foo","bar"]})", R"(["101xxx","<NULL>"])"},
+           RedisTraceRecord{"SADD", R"({"key":"myset","member":["1","2","3"]})", "3"},
+           RedisTraceRecord{"SSCAN",
+                            R"({"key":"myset","cursor":"0","pattern":"[a-z]+","count":"10"})",
+                            R"(["0","[]"])"},
+           RedisTraceRecord{"SCARD", R"({"key":"myset"})", "3"},
+           RedisTraceRecord{"SMEMBERS", R"({"key":"myset"})", R"(["1","2","3"])"},
+           RedisTraceRecord{"HMSET",
+                            R"({"key":"fooset","field value":[{"field":"f1"},)"
+                            R"({"value":"100"},{"field":"f2"},{"value":"200"}]})",
+                            "OK"},
+           RedisTraceRecord{"HMGET", R"({"key":"fooset","field":["f1","f2"]})", R"(["100","200"])"},
+           RedisTraceRecord{"HGET", R"({"key":"fooset","field":"f1"})", "100"},
+           RedisTraceRecord{"HGETALL", R"({"key":"fooset"})", R"(["f1","100","f2","200"])"},
+           RedisTraceRecord{"WATCH", R"({"key":["foo","bar"]})", "OK"},
+           RedisTraceRecord{"UNWATCH", "[]", "OK"},
+           RedisTraceRecord{"SELECT", R"({"index":"0"})", "OK"}}));
+  
   ContainsWithRelativeOrder(
       redis_trace_records, RedisTraceRecord{"PING", R"({"message":"test"})", "test"},
       RedisTraceRecord{"SET", R"({"key":"foo","value":"100","options":["EX 10","NX"]})", "OK"},
