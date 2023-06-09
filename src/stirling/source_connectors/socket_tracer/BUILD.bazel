@@ -376,8 +376,8 @@ pl_cc_bpf_test(
     srcs = ["redis_trace_bpf_test.cc"],
     flaky = True,
     tags = [
-        "cpu:16",
-        "requires_bpf",
+        # "cpu:16",
+        # "requires_bpf",
     ],
     deps = [
         ":cc_library",

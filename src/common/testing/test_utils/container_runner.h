@@ -127,6 +127,8 @@ class ContainerRunner {
 
   // The PID of the process within the container.
   int process_pid_ = -1;
+
+  bool started_ = false;
 };
 
 }  // namespace px

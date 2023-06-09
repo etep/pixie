@@ -54,6 +54,9 @@ ContainerRunner::ContainerRunner(std::filesystem::path image_tar,
 }
 
 ContainerRunner::~ContainerRunner() {
+  if (!started_) {
+    return;
+  }
   Stop();
 
   std::string podman_rm_cmd = absl::Substitute("podman rm -f $0 &>/dev/null", container_name_);
@@ -210,6 +213,7 @@ StatusOr<std::string> ContainerRunner::Run(const std::chrono::seconds& timeout,
         "Container $0 not in ready state, will try again ($1 attempts remaining).", container_name_,
         attempts_remaining);
 
+    started_ = true;
     sleep(kSleepSeconds);
   }
 
@@ -236,6 +240,10 @@ StatusOr<std::string> ContainerRunner::Run(const std::chrono::seconds& timeout,
 Status ContainerRunner::Stdout(std::string* out) { return podman_.Stdout(out); }
 
 void ContainerRunner::Stop() {
+  if (!started_) {
+    return;
+  }
+
   // Clean-up the container.
   if (podman_.IsRunning()) {
     podman_.Signal(SIGKILL);

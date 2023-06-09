@@ -158,6 +158,56 @@ class SocketTraceBPFTestFixture : public ::testing::Test {
   }
 };
 
+template <bool EnableClientSideTracing = false, bool Recording=false, bool Replaying=false>
+class SocketTraceBPFTestFixtureUC : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    FLAGS_stirling_disable_self_tracing = false;
+
+    // If client-side tracing is enabled, treat loopback as outside the cluster.
+    // This will interpret localhost connections as leaving the cluster and tracing will apply.
+    // WARNING: Do not use an if statement, because flags don't reset between successive tests.
+    // TODO(oazizi): Setting flags in the test is a bad idea because of the pitfall above.
+    //               Change this paradigm.
+    FLAGS_treat_loopback_as_in_cluster = !EnableClientSideTracing;
+    // ASSERT_FALSE(Recording);
+    // ASSERT_FALSE(Replaying);
+    ASSERT_OK(source_.Init({}, Recording, Replaying));
+
+    source_.RawPtr()->sampling_freq_mgr().set_period(std::chrono::milliseconds{100});
+
+    if constexpr (EnableClientSideTracing) {
+      // This makes the Stirling interpret all traffic as leaving the cluster,
+      // which means client-side tracing will also apply.
+      ASSERT_OK(source_.SetClusterCIDR("1.2.3.4/32"));
+    }
+  }
+
+  void TearDown() override { ASSERT_OK(source_.Stop()); }
+
+  void ConfigureBPFCapture(traffic_protocol_t protocol, uint64_t role) {
+    auto* socket_trace_connector = dynamic_cast<SocketTraceConnector*>(source_.RawPtr());
+    ASSERT_OK(socket_trace_connector->UpdateBPFProtocolTraceRole(protocol, role));
+  }
+
+  void TestOnlySetTargetPID(int64_t pid) {
+    FLAGS_test_only_socket_trace_target_pid = pid;
+    auto* socket_trace_connector = dynamic_cast<SocketTraceConnector*>(source_.RawPtr());
+    ASSERT_OK(socket_trace_connector->TestOnlySetTargetPID());
+  }
+
+  static constexpr int kCQLTableNum = SocketTraceConnector::kCQLTableNum;
+  static constexpr int kHTTPTableNum = SocketTraceConnector::kHTTPTableNum;
+  static constexpr int kPGSQLTableNum = SocketTraceConnector::kPGSQLTableNum;
+  static constexpr int kRedisTableNum = SocketTraceConnector::kRedisTableNum;
+  static constexpr int kKafkaTableNum = SocketTraceConnector::kKafkaTableNum;
+  static constexpr int kMySQLTableNum = SocketTraceConnector::kMySQLTableNum;
+  static constexpr int kConnStatsTableNum = SocketTraceConnector::kConnStatsTableNum;
+
+  UnitConnector<SocketTraceConnector> source_;
+};
+
+
 }  // namespace testing
 }  // namespace stirling
 }  // namespace px

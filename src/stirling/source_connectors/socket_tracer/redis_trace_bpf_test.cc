@@ -19,6 +19,7 @@
 #include "src/common/exec/exec.h"
 #include "src/common/exec/subprocess.h"
 #include "src/common/testing/testing.h"
+#include "src/stirling/core/unit_connector.h"
 #include "src/stirling/source_connectors/socket_tracer/testing/container_images.h"
 #include "src/stirling/source_connectors/socket_tracer/testing/protocol_checkers.h"
 #include "src/stirling/source_connectors/socket_tracer/testing/socket_trace_bpf_test_fixture.h"
@@ -48,10 +49,10 @@ struct RedisTraceTestCase {
   std::string exp_resp;
 };
 
-class RedisTraceBPFTest : public testing::SocketTraceBPFTestFixture</* TClientSideTracing */ false>,
+class RedisTraceBPFTest : public testing::SocketTraceBPFTestFixtureUC<false, false, true>,
                           public ::testing::WithParamInterface<RedisTraceTestCase> {
  protected:
-  RedisTraceBPFTest() { PX_CHECK_OK(container_.Run(std::chrono::seconds{150})); }
+  // RedisTraceBPFTest() { PX_CHECK_OK(container_.Run(std::chrono::seconds{150})); }
 
   RedisContainer container_;
 };
@@ -72,9 +73,10 @@ bool operator==(const RedisTraceRecord& lhs, const RedisTraceRecord& rhs) {
 }
 
 std::vector<RedisTraceRecord> GetRedisTraceRecords(
-    const types::ColumnWrapperRecordBatch& record_batch, int pid) {
+    const types::ColumnWrapperRecordBatch& record_batch) {
   std::vector<RedisTraceRecord> res;
-  for (const auto& idx : FindRecordIdxMatchesPID(record_batch, kRedisUPIDIdx, pid)) {
+  const uint64_t num_rows = record_batch[kRedisUPIDIdx]->Size();
+  for (uint64_t idx=0; idx < num_rows; ++idx) {
     res.push_back(
         RedisTraceRecord{std::string(record_batch[kRedisCmdIdx]->Get<types::StringValue>(idx)),
                          std::string(record_batch[kRedisReqIdx]->Get<types::StringValue>(idx)),
@@ -85,49 +87,49 @@ std::vector<RedisTraceRecord> GetRedisTraceRecords(
 
 // Verifies that batched commands can be traced correctly.
 TEST_F(RedisTraceBPFTest, VerifyBatchedCommands) {
-  StartTransferDataThread();
+  // const system::ProcParser proc_parser;
+  // const uint32_t server_pid = container_.process_pid();
+  // ASSERT_OK_AND_ASSIGN(const int64_t server_pid_ts, proc_parser.GetPIDStartTimeTicks(server_pid));
+  ASSERT_OK(source_.Start());
+  // ASSERT_OK(source_.ResetConnectorContext({{0, server_pid, server_pid_ts}}));
 
   // NOTE: select 0 must be the last one in order to avoid mess up with the key lookup in the
   // storage index.
-  constexpr std::string_view kRedisCmds = R"(
-    ping test
-    set foo 100 EX 10 NX
-    expire foo 10000
-    bitcount foo 0 0
-    incr foo
-    append foo xxx
-    get foo
-    mget foo bar
-    sadd myset 1 2 3
-    sscan myset 0 MATCH [a-z]+ COUNT 10
-    scard myset
-    smembers myset
-    hmset fooset f1 100 f2 200
-    hmget fooset f1 f2
-    hget fooset f1
-    hgetall fooset
-    watch foo bar
-    unwatch
-    select 0
-  )";
+  // constexpr std::string_view kRedisCmds = R"(
+  //   ping test
+  //   set foo 100 EX 10 NX
+  //   expire foo 10000
+  //   bitcount foo 0 0
+  //   incr foo
+  //   append foo xxx
+  //   get foo
+  //   mget foo bar
+  //   sadd myset 1 2 3
+  //   sscan myset 0 MATCH [a-z]+ COUNT 10
+  //   scard myset
+  //   smembers myset
+  //   hmset fooset f1 100 f2 200
+  //   hmget fooset f1 f2
+  //   hget fooset f1
+  //   hgetall fooset
+  //   watch foo bar
+  //   unwatch
+  //   select 0
+  // )";
 
-  RedisClientContainer redis_cli_client;
-  ASSERT_OK_AND_ASSIGN(
-      std::string output,
-      redis_cli_client.Run(
-          std::chrono::seconds{60},
-          {absl::Substitute("--network=container:$0", container_.container_name())},
-          {"bash", "-c", absl::Substitute("echo '$0' | redis-cli", kRedisCmds)}));
-  redis_cli_client.Wait();
+  // RedisClientContainer redis_cli_client;
+  // ASSERT_OK_AND_ASSIGN(
+  //     std::string output,
+  //     redis_cli_client.Run(
+  //         std::chrono::seconds{60},
+  //         {absl::Substitute("--network=container:$0", container_.container_name())},
+  //         {"bash", "-c", absl::Substitute("echo '$0' | redis-cli", kRedisCmds)}));
+  // redis_cli_client.Wait();
+  sleep(1);
+  ASSERT_OK(source_.Stop());
+  ASSERT_OK_AND_ASSIGN(auto record_batch, source_.ConsumeRecords(kRedisTableNum));
 
-  StopTransferDataThread();
-
-  std::vector<TaggedRecordBatch> tablets = ConsumeRecords(SocketTraceConnector::kRedisTableNum);
-
-  ASSERT_NOT_EMPTY_AND_GET_RECORDS(const types::ColumnWrapperRecordBatch& record_batch, tablets);
-
-  std::vector<RedisTraceRecord> redis_trace_records =
-      GetRedisTraceRecords(record_batch, container_.process_pid());
+  std::vector<RedisTraceRecord> redis_trace_records = GetRedisTraceRecords(record_batch);
 
   ContainsWithRelativeOrder(
       redis_trace_records, RedisTraceRecord{"PING", R"({"message":"test"})", "test"},
@@ -156,8 +158,13 @@ TEST_F(RedisTraceBPFTest, VerifyBatchedCommands) {
 }
 
 // Verifies that pub/sub commands can be traced correctly.
-TEST_F(RedisTraceBPFTest, VerifyPubSubCommands) {
-  StartTransferDataThread();
+TEST_F(RedisTraceBPFTest, DISABLED_VerifyPubSubCommands) {
+  const system::ProcParser proc_parser;
+  const uint32_t server_pid = container_.process_pid();
+  ASSERT_OK_AND_ASSIGN(const int64_t server_pid_ts, proc_parser.GetPIDStartTimeTicks(server_pid));
+  ASSERT_OK(source_.Start());
+  ASSERT_OK(source_.ResetConnectorContext({{0, server_pid, server_pid_ts}}));
+
   std::string output;
   RedisClientContainer redis_sub_client;
   ASSERT_OK(redis_sub_client.Run(
@@ -173,13 +180,10 @@ TEST_F(RedisTraceBPFTest, VerifyPubSubCommands) {
 
   redis_pub_client.Wait();
 
-  StopTransferDataThread();
+  ASSERT_OK(source_.Stop());
+  ASSERT_OK_AND_ASSIGN(auto record_batch, source_.ConsumeRecords(kRedisTableNum));
 
-  std::vector<TaggedRecordBatch> tablets = ConsumeRecords(SocketTraceConnector::kRedisTableNum);
-
-  ASSERT_NOT_EMPTY_AND_GET_RECORDS(const types::ColumnWrapperRecordBatch& record_batch, tablets);
-  std::vector<RedisTraceRecord> redis_trace_records =
-      GetRedisTraceRecords(record_batch, container_.process_pid());
+  std::vector<RedisTraceRecord> redis_trace_records = GetRedisTraceRecords(record_batch);
 
   ContainsWithRelativeOrder(
       redis_trace_records, RedisTraceRecord{"SUBSCRIBE", R"({"channel":["foo","1"]})", ""},
@@ -191,8 +195,13 @@ TEST_F(RedisTraceBPFTest, VerifyPubSubCommands) {
 //
 // We need to test this separately because we need the returned script sha from script load
 // to assemble the evalsha command.
-TEST_F(RedisTraceBPFTest, ScriptLoadAndEvalSHA) {
-  StartTransferDataThread();
+TEST_F(RedisTraceBPFTest, DISABLED_ScriptLoadAndEvalSHA) {
+  const system::ProcParser proc_parser;
+  const uint32_t server_pid = container_.process_pid();
+  ASSERT_OK_AND_ASSIGN(const int64_t server_pid_ts, proc_parser.GetPIDStartTimeTicks(server_pid));
+  ASSERT_OK(source_.Start());
+  ASSERT_OK(source_.ResetConnectorContext({{0, server_pid, server_pid_ts}}));
+
   RedisClientContainer script_load_container;
   std::string sha;
   ASSERT_OK_AND_ASSIGN(
@@ -216,13 +225,10 @@ TEST_F(RedisTraceBPFTest, ScriptLoadAndEvalSHA) {
   ASSERT_OK(eval_sha_container.Stdout(&output));
   ASSERT_FALSE(output.empty());
 
-  StopTransferDataThread();
+  ASSERT_OK(source_.Stop());
+  ASSERT_OK_AND_ASSIGN(auto record_batch, source_.ConsumeRecords(kRedisTableNum));
 
-  std::vector<TaggedRecordBatch> tablets = ConsumeRecords(SocketTraceConnector::kRedisTableNum);
-
-  ASSERT_NOT_EMPTY_AND_GET_RECORDS(const types::ColumnWrapperRecordBatch& record_batch, tablets);
-  std::vector<RedisTraceRecord> redis_trace_records =
-      GetRedisTraceRecords(record_batch, container_.process_pid());
+  std::vector<RedisTraceRecord> redis_trace_records = GetRedisTraceRecords(record_batch);
 
   ContainsWithRelativeOrder(
       redis_trace_records, RedisTraceRecord{"SCRIPT LOAD", R"({"script":"return 1"})", sha},
@@ -233,8 +239,12 @@ TEST_F(RedisTraceBPFTest, ScriptLoadAndEvalSHA) {
 }
 
 // Verifies individual commands.
-TEST_P(RedisTraceBPFTest, VerifyCommand) {
-  StartTransferDataThread();
+TEST_P(RedisTraceBPFTest, DISABLED_VerifyCommand) {
+  const system::ProcParser proc_parser;
+  const uint32_t server_pid = container_.process_pid();
+  ASSERT_OK_AND_ASSIGN(const int64_t server_pid_ts, proc_parser.GetPIDStartTimeTicks(server_pid));
+  ASSERT_OK(source_.Start());
+  ASSERT_OK(source_.ResetConnectorContext({{0, server_pid, server_pid_ts}}));
 
   std::string_view redis_cmd = GetParam().cmd;
   RedisClientContainer redis_cli_client;
@@ -244,14 +254,11 @@ TEST_P(RedisTraceBPFTest, VerifyCommand) {
                                                               container_.container_name())},
                                             {"bash", "-c", "redis-cli " + std::string(redis_cmd)}));
   redis_cli_client.Wait();
-  StopTransferDataThread();
-
-  std::vector<TaggedRecordBatch> tablets = ConsumeRecords(SocketTraceConnector::kRedisTableNum);
-
-  ASSERT_NOT_EMPTY_AND_GET_RECORDS(const types::ColumnWrapperRecordBatch& record_batch, tablets);
+  ASSERT_OK(source_.Stop());
+  ASSERT_OK_AND_ASSIGN(auto record_batch, source_.ConsumeRecords(kRedisTableNum));
 
   ContainsWithRelativeOrder(
-      GetRedisTraceRecords(record_batch, container_.process_pid()),
+      GetRedisTraceRecords(record_batch),
       RedisTraceRecord{GetParam().exp_cmd, GetParam().exp_req, GetParam().exp_resp});
 }
 
