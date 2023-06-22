@@ -20,6 +20,7 @@
 
 #include <utility>
 
+#include <absl/strings/str_replace.h>
 #include "src/shared/upid/upid.h"
 
 namespace px {
@@ -58,7 +59,9 @@ std::string ToString(const stirlingpb::TableSchema& schema,
         const auto val = col->Get<Time64NSValue>(index).val;
         std::time_t time = val / 1000000000UL;
         absl::Time t = absl::FromTimeT(time);
-        absl::StrAppend(&out, absl::FormatTime(kTimeFormat, t, kLocalTimeZone));
+        absl::StrAppend(
+            &out,
+            absl::Substitute("$0 ($1)", absl::FormatTime(kTimeFormat, t, kLocalTimeZone), val));
       } break;
       case DataType::INT64: {
         const auto val = col->Get<Int64Value>(index).val;
@@ -123,7 +126,7 @@ std::string ToString(std::string_view prefix, const stirlingpb::TableSchema& sch
                      const types::ColumnWrapperRecordBatch& record_batch) {
   std::string out;
   for (auto& record : ToString(schema, record_batch)) {
-    absl::StrAppend(&out, "[", prefix, "]", std::move(record), "\n");
+    absl::StrAppend(&out, "[", prefix, "]", absl::StrReplaceAll(record, {{"\n", ", "}}), "\n");
   }
   return out;
 }

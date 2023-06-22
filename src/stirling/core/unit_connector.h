@@ -37,7 +37,11 @@ class UnitConnector {
   using time_point = std::chrono::steady_clock::time_point;
 
  public:
-  UnitConnector() : data_tables_(T::kTables) {}
+  UnitConnector() : data_tables_(T::kTables) {
+    auto f = [](uint64_t, px::types::TabletID,
+                std::unique_ptr<px::types::ColumnWrapperRecordBatch>) { return Status::OK(); };
+    data_push_callback_ = f;
+  }
 
   ~UnitConnector() {
     if (started_ && !stopped_) {
@@ -50,6 +54,12 @@ class UnitConnector {
     // Invokes dtor of the underlying source connector.
     source_ = nullptr;
   }
+
+  Status RegisterDataPushCallback(DataPushCallback f) {
+    data_push_callback_ = f;
+    return Status::OK();
+  }
+  DataPushCallback data_push_callback_;
 
   Status Stop() {
     // Pedantic, but better than bravely carrying on if something is wrong here.
@@ -74,10 +84,13 @@ class UnitConnector {
     return Status::OK();
   }
 
-  Status Start(absl::flat_hash_set<md::UPID> upids={}) {
+  Status Start(absl::flat_hash_set<md::UPID> upids = {}) {
     // Pedantic, but better than bravely carrying on if something is wrong here.
     PX_RETURN_IF_ERROR(VerifyInitted());
 
+    if (upids.size() == 0) {
+      PX_ASSIGN_OR_RETURN(upids, ParsePidsFlag());
+    }
     if (upids.size() == 0) {
       // The upids set is empty: trace all processes and use automatic context refresh.
       ctx_ = std::make_unique<EverythingLocalContext>();
@@ -122,6 +135,9 @@ class UnitConnector {
     // Stop transferring data.
     PX_RETURN_IF_ERROR(StopTransferDataThread());
     if (upids.size() == 0) {
+      PX_ASSIGN_OR_RETURN(upids, ParsePidsFlag());
+    }
+    if (upids.size() == 0) {
       // The upids set is empty: trace all processes and use automatic context refresh.
       ctx_ = std::make_unique<EverythingLocalContext>();
     } else {
@@ -134,7 +150,8 @@ class UnitConnector {
     return Status::OK();
   }
 
-  Status Init(absl::flat_hash_set<md::UPID> upids = {}, const bool record=false, const bool replay=false) {
+  Status Init(absl::flat_hash_set<md::UPID> upids = {}, const bool record = false,
+              const bool replay = false) {
     if (upids.size() == 0) {
       // Enter this branch if Init() is called with no arguments (i.e. with a default empty set).
       // ParsePidsFlag() inspects the value in FLAGS_pids to find any pids the user specified
@@ -143,13 +160,13 @@ class UnitConnector {
     }
 
     source_ = T::Create("source_connector");
-    if(record) {
+    if (record) {
       source_->SetRecordingMode();
     }
-    if(replay) {
+    if (replay) {
       source_->SetReplayingMode();
     }
-    
+
     // Compile the eBPF program and create eBPF perf buffers and maps as needed.
     PX_RETURN_IF_ERROR(source_->Init());
 
@@ -243,6 +260,8 @@ class UnitConnector {
       PX_ASSIGN_OR_RETURN(const uint64_t ts, system::ProcParser().GetPIDStartTimeTicks(int_pid));
 
       // Create a upid and add it to the upids set.
+      LOG(WARNING) << "Tracking upid (asid, pid, time-stamp): " << kASID << ", " << int_pid << ", "
+                   << ts;
       upids.insert(md::UPID(kASID, int_pid, ts));
     }
     return upids;
@@ -268,11 +287,17 @@ class UnitConnector {
     if (source_->sampling_freq_mgr().period() > std::chrono::seconds{90}) {
       return error::Internal("Source connector has sampling period > 90 seconds.");
     }
+    // if (source_->sampling_freq_mgr().period() > source_->push_freq_mgr().period()) {
+    //   return error::Internal("Source connector has sampling period > push period.");
+    // }
+    // const uint64_t samples_per_push = source_->push_freq_mgr().period() /
+    // source_->sampling_freq_mgr().period();
 
     while (transfer_enable_) {
       const auto t0 = std::chrono::steady_clock::now();
       ctx_->RefreshUPIDList();
       source_->TransferData(ctx_.get());
+      source_->PushData(data_push_callback_);
       const auto t1 = std::chrono::steady_clock::now();
       const auto t_elapsed = t1 - t0;
       std::this_thread::sleep_for(source_->sampling_freq_mgr().period() - t_elapsed);
@@ -281,6 +306,7 @@ class UnitConnector {
 
     // Transfer any remaining data from eBPF to user space.
     source_->TransferData(ctx_.get());
+    source_->PushData(data_push_callback_);
 
     return Status::OK();
   }

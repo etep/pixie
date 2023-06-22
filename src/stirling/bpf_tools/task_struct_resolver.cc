@@ -245,11 +245,13 @@ StatusOr<TaskStructOffsets> ResolveTaskStructOffsetsCore() {
   StirlingProbeTrigger();
 
   // Retrieve the task struct address from BPF map.
-  auto task_struct_address_map = WrappedBCCArrayTable<uint64_t>::Create(bcc.get(), "task_struct_address_map");
+  auto task_struct_address_map =
+      WrappedBCCArrayTable<uint64_t>::Create(bcc.get(), "task_struct_address_map");
   PX_ASSIGN_OR_RETURN(const uint64_t task_struct_addr, task_struct_address_map->GetValue(0));
 
   // Retrieve the raw memory buffer of the task struct.
-  auto task_struct_buf_array = WrappedBCCArrayTable<struct buf>::Create(bcc.get(), "task_struct_address_map");
+  auto task_struct_buf_array =
+      WrappedBCCArrayTable<struct buf>::Create(bcc.get(), "task_struct_address_map");
   PX_ASSIGN_OR_RETURN(const struct buf buf, task_struct_buf_array->GetValue(0));
 
   // Analyze the raw data buffer for the patterns we are looking for.
@@ -359,8 +361,9 @@ StatusOr<uint64_t> ResolveTaskStructExitCodeOffset() {
                                             std::string("tracepoint__sched__sched_process_exit")}));
 
   const std::string kProcExitTargetPIDTableName = "proc_exit_target_pid";
-  auto proc_exit_target_pid_table = WrappedBCCArrayTable<uint32_t>::Create(bcc.get(), kProcExitTargetPIDTableName);
-  
+  auto proc_exit_target_pid_table =
+      WrappedBCCArrayTable<uint32_t>::Create(bcc.get(), kProcExitTargetPIDTableName);
+
   // Set target PID in BPF map, which only report event triggered by the launched subprocess.
   PX_RETURN_IF_ERROR(proc_exit_target_pid_table->SetValue(0, proc.child_pid()));
   // ebpf::StatusTuple ebpf_st =
@@ -389,7 +392,8 @@ StatusOr<uint64_t> ResolveTaskStructExitCodeOffset() {
   }
 
   // Retrieve the raw memory buffer of the task struct.
-  auto task_struct_buf_array = WrappedBCCArrayTable<struct buf>::Create(bcc.get(), "task_struct_buf");
+  auto task_struct_buf_array =
+      WrappedBCCArrayTable<struct buf>::Create(bcc.get(), "task_struct_buf");
   PX_ASSIGN_OR_RETURN(const struct buf buf, task_struct_buf_array->GetValue(0));
   // if (!ebpf_st.ok()) {
   //   return error::Internal("Failed to read task_struct_buf, message: $0", ebpf_st.msg());

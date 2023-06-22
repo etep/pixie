@@ -94,7 +94,7 @@ Status ProcessQueryReq(Frame* req_frame, Request* req) {
 
   // For now, just tag the parameter values to the end.
   if (!hex_values.empty()) {
-    absl::StrAppend(&req->msg, "\n");
+    absl::StrAppend(&req->msg, ", ");
     absl::StrAppend(&req->msg, ToJSONString(hex_values));
   }
 
@@ -231,9 +231,9 @@ Status ProcessResultResp(Frame* resp_frame, Response* resp) {
         names.push_back(std::move(c.name));
       }
 
-      resp->msg = absl::StrCat("Response type = ROWS\n",
-                               "Number of columns = ", r_resp.metadata.columns_count, "\n",
-                               ToJSONString(names), "\n", "Number of rows = ", r_resp.rows_count);
+      resp->msg = absl::StrCat("Response type = ROWS, ",
+                               "Number of columns = ", r_resp.metadata.columns_count, ", ",
+                               ToJSONString(names), ", ", "Number of rows = ", r_resp.rows_count);
       // TODO(oazizi): Consider which other parts of metadata would be interesting to record into
       // resp.
       break;
@@ -241,7 +241,7 @@ Status ProcessResultResp(Frame* resp_frame, Response* resp) {
     case ResultRespKind::kSetKeyspace: {
       const auto& r_resp = std::get<ResultSetKeyspaceResp>(r.resp);
       resp->msg =
-          absl::StrCat("Response type = SET_KEYSPACE\n", "Keyspace = ", r_resp.keyspace_name);
+          absl::StrCat("Response type = SET_KEYSPACE, ", "Keyspace = ", r_resp.keyspace_name);
       break;
     }
     case ResultRespKind::kPrepared: {

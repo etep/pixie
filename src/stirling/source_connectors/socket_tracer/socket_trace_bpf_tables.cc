@@ -44,12 +44,12 @@ NO_OPT_ATTR void ConnInfoMapCleanupTrigger(int n, struct conn_id_t* conn_id_vec)
 namespace px {
 namespace stirling {
 
-using px::system::ProcPidPath;
 using px::stirling::bpf_tools::WrappedBCCMap;
+using px::system::ProcPidPath;
 
-ConnInfoMapManager::ConnInfoMapManager(bpf_tools::BCCWrapper* bcc) :
-  conn_info_map_(WrappedBCCMap<uint64_t, struct conn_info_t>::Create(bcc, "conn_info_map")),
-  conn_disabled_map_(WrappedBCCMap<uint64_t, uint64_t>::Create(bcc, "conn_disabled_map")) {
+ConnInfoMapManager::ConnInfoMapManager(bpf_tools::BCCWrapper* bcc)
+    : conn_info_map_(WrappedBCCMap<uint64_t, struct conn_info_t>::Create(bcc, "conn_info_map")),
+      conn_disabled_map_(WrappedBCCMap<uint64_t, uint64_t>::Create(bcc, "conn_disabled_map")) {
   std::filesystem::path self_path = GetSelfPath().ValueOrDie();
   auto elf_reader_or_s = obj_tools::ElfReader::Create(self_path.string());
   if (!elf_reader_or_s.ok()) {

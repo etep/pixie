@@ -35,8 +35,8 @@
 
 #include <linux/perf_event.h>
 
-#include <gtest/gtest_prod.h>
 #include <absl/container/flat_hash_set.h>
+#include <gtest/gtest_prod.h>
 
 #include <filesystem>
 #include <map>
@@ -201,7 +201,7 @@ struct PerfBufferSpec {
   // to count this buffer's size against.
   PerfBufferSizeCategory size_category = PerfBufferSizeCategory::kUncategorized;
 
-  void * cb_cookie;
+  void* cb_cookie;
 
   std::string ToString() const {
     return absl::Substitute("name=$0 size_bytes=$1 size_category=$2", name, size_bytes,
@@ -232,7 +232,7 @@ struct PerfEventSpec {
  * Wrapper around BCC, as a convenience.
  */
 class BCCWrapper {
-  public:
+ public:
   void SetRecordingMode();
   void SetReplayingMode();
 
@@ -270,7 +270,9 @@ class BCCWrapper {
    * @return error if no root access, code could not be compiled, or required linux headers are not
    *               available.
    */
-  Status InitBPFProgram(std::string_view bpf_program, std::vector<std::string> cflags = {}, bool requires_linux_headers = true, bool always_infer_task_struct_offsets = false);
+  Status InitBPFProgram(std::string_view bpf_program, std::vector<std::string> cflags = {},
+                        bool requires_linux_headers = true,
+                        bool always_infer_task_struct_offsets = false);
 
   /**
    * Attach a single kprobe.
@@ -309,6 +311,9 @@ class BCCWrapper {
    */
   Status OpenPerfBuffer(const PerfBufferSpec& pb_spec);
 
+  ebpf::BPFPerfBuffer* GetPerfBuffer(const std::string& perf_buffer_name) {
+    return bpf_.get_perf_buffer(perf_buffer_name);
+  }
   /**
    * Attach a perf event, which runs a probe every time a perf counter reaches a threshold
    * condition.
@@ -375,7 +380,8 @@ class BCCWrapper {
    * @param config PERF_COUNT_HW_CPU_CYCLES, PERF_COUNT_HW_INSTRUCTIONS, etc...
    * @return Error status.
    */
-  Status PopulateBPFPerfArray(const std::string& table_name, const uint32_t type, const uint64_t config) {
+  Status PopulateBPFPerfArray(const std::string& table_name, const uint32_t type,
+                              const uint64_t config) {
     PX_RETURN_IF_ERROR(bpf_.open_perf_event(table_name, type, config));
     return Status::OK();
   }
@@ -390,7 +396,7 @@ class BCCWrapper {
    *                   and catch new events in the next iteration.
    */
   void PollPerfBuffers(int timeout_ms = 0);
-  
+
   /**
    * Detaches all probes, and closes all perf buffers that are open.
    */
@@ -405,7 +411,7 @@ class BCCWrapper {
   static size_t num_open_perf_buffers() { return num_open_perf_buffers_; }
   static size_t num_attached_perf_events() { return num_attached_perf_events_; }
 
-  private:
+ private:
   FRIEND_TEST(BCCWrapperTest, DetachUProbe);
 
   Status DetachKProbe(const KProbeSpec& probe);
@@ -444,7 +450,7 @@ class BCCWrapper {
   //   DEBUG_SOURCE = 0x8,
   //   DEBUG_BPF_REGISTER_STATE = 0x10,
   //   DEBUG_BTF = 0x20,
-  public:
+ public:
   ebpf::BPF bpf_;
 
   // These are static counters across all instances, because:
@@ -457,13 +463,14 @@ class BCCWrapper {
   inline static size_t num_open_perf_buffers_;
   inline static size_t num_attached_perf_events_;
 
-  private:
+ private:
   // This is shared by all source connectors that uses BCCWrapper.
   inline static std::optional<utils::TaskStructOffsets> task_struct_offsets_opt_;
-  
-  public:
+
+ public:
   void WriteProto();
-  private:
+
+ private:
   // void RecordPerfBuffer(void* cb_cookie, void* data, int data_size);
   std::map<std::string, perf_reader_raw_cb> replay_cb_fns_;
   bool recording_ = false;
@@ -473,63 +480,69 @@ class BCCWrapper {
   // int playback_event_idx_ = 0;
 };
 
-void RecordBPFArrayTableGetValueEvent( const std::string& name, const int32_t idx, const uint32_t data_size, void const * const data );
-StatusOr<rr::BPFArrayTableGetValueEvent> GetReplayEventBPFArrayTableGetValueEvent( const std::string& name, const int32_t idx, const uint32_t data_size );
+void RecordBPFArrayTableGetValueEvent(const std::string& name, const int32_t idx,
+                                      const uint32_t data_size, void const* const data);
+StatusOr<rr::BPFArrayTableGetValueEvent> GetReplayEventBPFArrayTableGetValueEvent(
+    const std::string& name, const int32_t idx, const uint32_t data_size);
 
-template<typename T> StatusOr<T> ReplayBPFArrayTableGetValueEvent( const std::string& name, const int32_t idx ) {
+template <typename T>
+StatusOr<T> ReplayBPFArrayTableGetValueEvent(const std::string& name, const int32_t idx) {
   T value;
-  PX_ASSIGN_OR_RETURN( auto event, GetReplayEventBPFArrayTableGetValueEvent(name, idx, sizeof(T)));
+  PX_ASSIGN_OR_RETURN(auto event, GetReplayEventBPFArrayTableGetValueEvent(name, idx, sizeof(T)));
   const auto data = event.data();
   const auto data_size = data.size();
-  LOG(WARNING) << "ReplayBPFArrayTableGetValueEvent(), name: " << name << ", data.size(): " << data_size << ".";
-  memcpy( &value, data.data(), data_size );
+  LOG(WARNING) << "ReplayBPFArrayTableGetValueEvent(), name: " << name
+               << ", data.size(): " << data_size << ".";
+  memcpy(&value, data.data(), data_size);
   return value;
 }
 
-template <typename T> class WrappedBCCArrayTable {
-  public:
+template <typename T>
+class WrappedBCCArrayTable {
+ public:
   using U = ebpf::BPFArrayTable<T>;
 
-  WrappedBCCArrayTable(bpf_tools::BCCWrapper* bcc, const std::string& name) :
-    name_(name),
-    recording_(bcc->IsRecording()),
-    replaying_(bcc->IsReplaying()) {
-    if(!replaying_) {
+  WrappedBCCArrayTable(bpf_tools::BCCWrapper* bcc, const std::string& name)
+      : name_(name), recording_(bcc->IsRecording()), replaying_(bcc->IsReplaying()) {
+    if (!replaying_) {
       underlying_ = std::make_unique<U>(bcc->bpf_.get_array_table<T>(name_));
     }
   }
 
-  static std::unique_ptr<WrappedBCCArrayTable> Create(bpf_tools::BCCWrapper* bcc, const std::string& name) {
+  static std::unique_ptr<WrappedBCCArrayTable> Create(bpf_tools::BCCWrapper* bcc,
+                                                      const std::string& name) {
     return std::unique_ptr<WrappedBCCArrayTable>(new WrappedBCCArrayTable(bcc, name));
   }
 
   StatusOr<T> GetValue(const uint32_t idx) {
     T value;
-    if(replaying_) {
+    if (replaying_) {
       return ReplayBPFArrayTableGetValueEvent<T>(name_, idx);
     }
     ebpf::StatusTuple s = underlying_->get_value(idx, value);
-    if( !s.ok() ) {
-      return error::Internal(absl::Substitute("BCC failed to get value for array table: $0, idx: $1.", name_, idx));
+    if (!s.ok()) {
+      return error::Internal(
+          absl::Substitute("BCC failed to get value for array table: $0, idx: $1.", name_, idx));
     }
-    if(recording_) {
+    if (recording_) {
       RecordBPFArrayTableGetValueEvent(name_, idx, sizeof(value), &value);
     }
     return value;
   }
 
   Status SetValue(const uint32_t idx, const T& value) {
-    if(replaying_) {
+    if (replaying_) {
       return Status::OK();
     }
     ebpf::StatusTuple s = underlying_->update_value(idx, value);
-    if( !s.ok() ) {
-      return error::Internal(absl::Substitute("BCC failed to set value for array table: $0, idx: $1.", name_, idx));
+    if (!s.ok()) {
+      return error::Internal(
+          absl::Substitute("BCC failed to set value for array table: $0, idx: $1.", name_, idx));
     }
     return Status::OK();
   }
 
-  private:
+ private:
   const std::string name_;
   const bool recording_;
   const bool replaying_;
@@ -537,42 +550,44 @@ template <typename T> class WrappedBCCArrayTable {
   std::unique_ptr<U> underlying_;
 };
 
-template <typename K, typename V> class WrappedBCCMap {
-  public:
+template <typename K, typename V>
+class WrappedBCCMap {
+ public:
   using U = ebpf::BPFHashTable<K, V>;
-  
-  WrappedBCCMap(bpf_tools::BCCWrapper* bcc, const std::string& name) :
-    name_(name),
-    recording_(bcc->IsRecording()),
-    replaying_(bcc->IsReplaying()) {
-    if(!replaying_) {
+
+  WrappedBCCMap(bpf_tools::BCCWrapper* bcc, const std::string& name)
+      : name_(name), recording_(bcc->IsRecording()), replaying_(bcc->IsReplaying()) {
+    if (!replaying_) {
       underlying_ = std::make_unique<U>(bcc->bpf_.get_hash_table<K, V>(name_));
     }
   }
 
-  static std::unique_ptr<WrappedBCCMap> Create(bpf_tools::BCCWrapper* bcc, const std::string& name) {
+  static std::unique_ptr<WrappedBCCMap> Create(bpf_tools::BCCWrapper* bcc,
+                                               const std::string& name) {
     return std::unique_ptr<WrappedBCCMap>(new WrappedBCCMap(bcc, name));
   }
 
-  StatusOr<V> GetValue(const K& key) const  {
+  StatusOr<V> GetValue(const K& key) const {
     V value;
-    if(replaying_) {
+    if (replaying_) {
       return value;
     }
     ebpf::StatusTuple s = underlying_->get_value(key, value);
-    if( !s.ok() ) {
-      return error::Internal(absl::Substitute("BCC failed to get value for array table: $0, key: $1.", name_, key));
+    if (!s.ok()) {
+      return error::Internal(
+          absl::Substitute("BCC failed to get value for array table: $0, key: $1.", name_, key));
     }
     return value;
   }
 
   Status SetValue(const K& key, const V& value) {
-    if(replaying_) {
+    if (replaying_) {
       return Status::OK();
     }
     ebpf::StatusTuple s = underlying_->update_value(key, value);
-    if( !s.ok() ) {
-      return error::Internal(absl::Substitute("BCC failed to set value for array table: $0, key: $1.", name_, key));
+    if (!s.ok()) {
+      return error::Internal(
+          absl::Substitute("BCC failed to set value for array table: $0, key: $1.", name_, key));
     }
     return Status::OK();
   }
@@ -589,24 +604,24 @@ template <typename K, typename V> class WrappedBCCMap {
   }
 
   // StatusOr<absl::flat_hash_map<K, V>> GetTableOffline() const {
-  absl::flat_hash_map<K, V> GetTableOffline(const bool clear_table=false) const {
+  absl::flat_hash_map<K, V> GetTableOffline(const bool clear_table = false) const {
     absl::flat_hash_map<K, V> r;
-    if(replaying_) {
+    if (replaying_) {
       return r;
     }
-    for( const auto& k : shadow_keys_) {
+    for (const auto& k : shadow_keys_) {
       auto s = GetValue(k);
       const auto v = s.ConsumeValueOrDie();
       // PX_ASSIGN_OR_RETURN( const auto v, GetValue(k));
       r[k] = v;
-      if(clear_table) {
+      if (clear_table) {
         PX_UNUSED(underlying_->remove_value(k));
       }
     }
     return r;
   }
 
-  private:
+ private:
   const std::string name_;
   const bool recording_;
   const bool replaying_;
@@ -615,36 +630,63 @@ template <typename K, typename V> class WrappedBCCMap {
   absl::flat_hash_set<K> shadow_keys_;
 };
 
-template <typename T> class WrappedBCCPerCPUArrayTable {
-  public:
+template <typename T>
+class WrappedBCCPerCPUArrayTable {
+ public:
   using U = ebpf::BPFPercpuArrayTable<T>;
-  
-  WrappedBCCPerCPUArrayTable(bpf_tools::BCCWrapper* bcc, const std::string& name) :
-    name_(name),
-    recording_(bcc->IsRecording()),
-    replaying_(bcc->IsReplaying()) {
-    if(!replaying_) {
+
+  WrappedBCCPerCPUArrayTable(bpf_tools::BCCWrapper* bcc, const std::string& name)
+      : name_(name), recording_(bcc->IsRecording()), replaying_(bcc->IsReplaying()) {
+    if (!replaying_) {
       underlying_ = std::make_unique<U>(bcc->bpf_.get_percpu_array_table<T>(name_));
     }
   }
 
-  static std::unique_ptr<WrappedBCCPerCPUArrayTable> Create(bpf_tools::BCCWrapper* bcc, const std::string& name) {
+  static std::unique_ptr<WrappedBCCPerCPUArrayTable> Create(bpf_tools::BCCWrapper* bcc,
+                                                            const std::string& name) {
     return std::unique_ptr<WrappedBCCPerCPUArrayTable>(new WrappedBCCPerCPUArrayTable(bcc, name));
   }
 
   Status SetValues(const int idx, const T& value) {
-    if(replaying_) {
+    if (replaying_) {
       return Status::OK();
     }
     std::vector<T> values(bpf_tools::BCCWrapper::kCPUCount, value);
     auto update_res = underlying_->update_value(idx, values);
     if (!update_res.ok()) {
-      return error::Internal(absl::Substitute("Failed to set value on index: $0, error message: $1", idx, update_res.msg()));
+      return error::Internal(absl::Substitute("Failed to set value on index: $0, error message: $1",
+                                              idx, update_res.msg()));
     }
     return Status::OK();
   }
 
-  private:
+ private:
+  const std::string name_;
+  const bool recording_;
+  const bool replaying_;
+
+  std::unique_ptr<U> underlying_;
+};
+
+class WrappedBCCStackTable {
+ public:
+  using U = ebpf::BPFStackTable;
+
+  WrappedBCCStackTable(bpf_tools::BCCWrapper* bcc, const std::string& name)
+      : name_(name), recording_(bcc->IsRecording()), replaying_(bcc->IsReplaying()) {
+    if (!replaying_) {
+      underlying_ = std::make_unique<U>(bcc->bpf_.get_stack_table(name_));
+    }
+  }
+
+  static std::unique_ptr<WrappedBCCStackTable> Create(bpf_tools::BCCWrapper* bcc,
+                                                      const std::string& name) {
+    return std::unique_ptr<WrappedBCCStackTable>(new WrappedBCCStackTable(bcc, name));
+  }
+
+  U* RawPtr() { return underlying_.get(); }
+
+ private:
   const std::string name_;
   const bool recording_;
   const bool replaying_;

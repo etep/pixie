@@ -70,12 +70,17 @@ void UProbeManager::Init(bool enable_http2_tracing, bool disable_self_probing) {
   cfg_enable_http2_tracing_ = enable_http2_tracing;
   cfg_disable_self_probing_ = disable_self_probing;
 
-  openssl_symaddrs_map_      = WrappedBCCMap<uint32_t, struct openssl_symaddrs_t>::Create(bcc_, "openssl_symaddrs_map");
-  go_common_symaddrs_map_    = WrappedBCCMap<uint32_t, struct go_common_symaddrs_t>::Create(bcc_, "go_common_symaddrs_map");
-  go_http2_symaddrs_map_     = WrappedBCCMap<uint32_t, struct go_http2_symaddrs_t>::Create(bcc_, "http2_symaddrs_map");
-  go_tls_symaddrs_map_       = WrappedBCCMap<uint32_t, struct go_tls_symaddrs_t>::Create(bcc_, "go_tls_symaddrs_map");
-  node_tlswrap_symaddrs_map_ = WrappedBCCMap<uint32_t, struct node_tlswrap_symaddrs_t>::Create(bcc_, "node_tlswrap_symaddrs_map");
-  grpc_c_versions_map_       = WrappedBCCMap<uint32_t, uint64_t>::Create(bcc_, "grpc_c_versions");
+  openssl_symaddrs_map_ =
+      WrappedBCCMap<uint32_t, struct openssl_symaddrs_t>::Create(bcc_, "openssl_symaddrs_map");
+  go_common_symaddrs_map_ =
+      WrappedBCCMap<uint32_t, struct go_common_symaddrs_t>::Create(bcc_, "go_common_symaddrs_map");
+  go_http2_symaddrs_map_ =
+      WrappedBCCMap<uint32_t, struct go_http2_symaddrs_t>::Create(bcc_, "http2_symaddrs_map");
+  go_tls_symaddrs_map_ =
+      WrappedBCCMap<uint32_t, struct go_tls_symaddrs_t>::Create(bcc_, "go_tls_symaddrs_map");
+  node_tlswrap_symaddrs_map_ = WrappedBCCMap<uint32_t, struct node_tlswrap_symaddrs_t>::Create(
+      bcc_, "node_tlswrap_symaddrs_map");
+  grpc_c_versions_map_ = WrappedBCCMap<uint32_t, uint64_t>::Create(bcc_, "grpc_c_versions");
 }
 
 void UProbeManager::NotifyMMapEvent(upid_t upid) {

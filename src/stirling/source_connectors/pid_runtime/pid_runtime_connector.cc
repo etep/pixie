@@ -49,8 +49,9 @@ void PIDRuntimeConnector::TransferDataImpl(ConnectorContext* /* ctx */) {
     return;
   }
 
-  std::vector<std::pair<uint16_t, pidruntime_val_t>> items =
-      GetHashTable<uint16_t, pidruntime_val_t>("pid_cpu_time").get_table_offline();
+  auto pid_cpu_time =
+      bpf_tools::WrappedBCCMap<uint16_t, pidruntime_val_t>::Create(this, "pid_cpu_time");
+  auto items = pid_cpu_time->GetTableOffline();
 
   for (auto& item : items) {
     // TODO(kgandhi): PL-460 Consider using other types of BPF tables to avoid a searching through

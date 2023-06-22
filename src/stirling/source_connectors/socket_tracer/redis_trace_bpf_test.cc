@@ -52,10 +52,11 @@ struct RedisTraceTestCase {
 namespace {
 constexpr bool kRecording = true;
 constexpr bool kReplaying = false;
-}
+}  // namespace
 
-class RedisTraceBPFTest : public testing::SocketTraceBPFTestFixtureUC<false, kRecording, kReplaying>,
-                          public ::testing::WithParamInterface<RedisTraceTestCase> {
+class RedisTraceBPFTest
+    : public testing::SocketTraceBPFTestFixtureUC<false, kRecording, kReplaying>,
+      public ::testing::WithParamInterface<RedisTraceTestCase> {
  protected:
   RedisTraceBPFTest() {
     if (!kReplaying) {
@@ -85,7 +86,7 @@ std::vector<RedisTraceRecord> GetRedisTraceRecords(
     const types::ColumnWrapperRecordBatch& record_batch) {
   std::vector<RedisTraceRecord> res;
   const uint64_t num_rows = record_batch[kRedisUPIDIdx]->Size();
-  for (uint64_t idx=0; idx < num_rows; ++idx) {
+  for (uint64_t idx = 0; idx < num_rows; ++idx) {
     res.push_back(
         RedisTraceRecord{std::string(record_batch[kRedisCmdIdx]->Get<types::StringValue>(idx)),
                          std::string(record_batch[kRedisReqIdx]->Get<types::StringValue>(idx)),
@@ -99,8 +100,7 @@ TEST_F(RedisTraceBPFTest, VerifyBatchedCommands) {
   if (kReplaying) {
     ASSERT_OK(source_.Start());
     sleep(1);
-  }
-  else {
+  } else {
     const system::ProcParser proc_parser;
     const uint32_t server_pid = container_.process_pid();
     ASSERT_OK_AND_ASSIGN(const int64_t server_pid_ts, proc_parser.GetPIDStartTimeTicks(server_pid));
@@ -185,7 +185,7 @@ TEST_F(RedisTraceBPFTest, VerifyBatchedCommands) {
            RedisTraceRecord{"WATCH", R"({"key":["foo","bar"]})", "OK"},
            RedisTraceRecord{"UNWATCH", "[]", "OK"},
            RedisTraceRecord{"SELECT", R"({"index":"0"})", "OK"}}));
-  
+
   ContainsWithRelativeOrder(
       redis_trace_records, RedisTraceRecord{"PING", R"({"message":"test"})", "test"},
       RedisTraceRecord{"SET", R"({"key":"foo","value":"100","options":["EX 10","NX"]})", "OK"},

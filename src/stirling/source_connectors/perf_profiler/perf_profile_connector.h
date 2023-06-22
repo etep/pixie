@@ -105,10 +105,10 @@ class PerfProfileConnector : public SourceConnector, public bpf_tools::BCCWrappe
   void CheckProfilerState(const uint64_t num_stack_traces);
 
   // data structures shared with BPF:
-  std::unique_ptr<ebpf::BPFStackTable> stack_traces_a_;
-  std::unique_ptr<ebpf::BPFStackTable> stack_traces_b_;
+  std::unique_ptr<bpf_tools::WrappedBCCStackTable> stack_traces_a_;
+  std::unique_ptr<bpf_tools::WrappedBCCStackTable> stack_traces_b_;
 
-  std::unique_ptr<ebpf::BPFArrayTable<uint64_t>> profiler_state_;
+  std::unique_ptr<bpf_tools::WrappedBCCArrayTable<uint64_t>> profiler_state_;
   prometheus::Gauge& profiler_state_overflow_gauge_;
   prometheus::Counter& profiler_transfer_data_counter_;
   prometheus::Counter& profiler_state_overflow_counter_;

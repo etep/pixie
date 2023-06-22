@@ -158,7 +158,7 @@ class SocketTraceBPFTestFixture : public ::testing::Test {
   }
 };
 
-template <bool EnableClientSideTracing = false, bool Recording=false, bool Replaying=false>
+template <bool EnableClientSideTracing = false, bool Recording = false, bool Replaying = false>
 class SocketTraceBPFTestFixtureUC : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -206,7 +206,6 @@ class SocketTraceBPFTestFixtureUC : public ::testing::Test {
 
   UnitConnector<SocketTraceConnector> source_;
 };
-
 
 }  // namespace testing
 }  // namespace stirling

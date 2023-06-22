@@ -184,7 +184,7 @@ class SocketTraceConnector : public SourceConnector, public bpf_tools::BCCWrappe
   explicit SocketTraceConnector(std::string_view source_name);
 
   Status InitBPF();
-  auto InitPerfBufferSpecs(void * cb_cookie);
+  auto InitPerfBufferSpecs(void* cb_cookie);
   void InitProtocolTransferSpecs();
 
   ConnTracker& GetOrCreateConnTracker(struct conn_id_t conn_id);

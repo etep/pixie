@@ -44,7 +44,7 @@ class ConnInfoMapManager {
 
   void CleanupBPFMapLeaks(ConnTrackersManager* conn_trackers_mgr);
 
-  private:
+ private:
   std::unique_ptr<WrappedBCCMap<uint64_t, struct conn_info_t>> conn_info_map_;
   std::unique_ptr<WrappedBCCMap<uint64_t, uint64_t>> conn_disabled_map_;
 

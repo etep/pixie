@@ -30,6 +30,7 @@ void DefaultMonoToRealtimeConverter::Update() {
 
   uint64_t mono_time_val = kSecToNanosecFactor * time.tv_sec + time.tv_nsec;
   uint64_t real_time_val = kSecToNanosecFactor * real_time.tv_sec + real_time.tv_nsec;
+  LOG(INFO) << "mono_time_val: " << mono_time_val << ", real_time_val: " << real_time_val;
   mono_to_realtime_.Emplace(mono_time_val, real_time_val);
 }
 

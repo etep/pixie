@@ -64,13 +64,14 @@ struct UProbeTmpl {
 // // A wrapper around BPF maps that are exclusively written by user-space.
 // // Provides an optimized RemoveValue() interface that avoids the BPF access
 // // if the key doesn't exist.
-// template <typename TKeyType, typename TValueType, typename TMapType = ebpf::BPFHashTable<TKeyType, TValueType>>
-// class UserSpaceManagedBPFMap {
+// template <typename TKeyType, typename TValueType, typename TMapType =
+// ebpf::BPFHashTable<TKeyType, TValueType>> class UserSpaceManagedBPFMap {
 //  public:
-//   static std::unique_ptr<UserSpaceManagedBPFMap> Create(bpf_tools::BCCWrapper* bcc, const std::string& map_name) {
+//   static std::unique_ptr<UserSpaceManagedBPFMap> Create(bpf_tools::BCCWrapper* bcc, const
+//   std::string& map_name) {
 //     return std::unique_ptr<UserSpaceManagedBPFMap>(new UserSpaceManagedBPFMap(bcc, map_name));
 //   }
-// 
+//
 //   void UpdateValue(TKeyType key, TValueType value) {
 //     ebpf::StatusTuple s = map_->update_value(key, value);
 //     if (s.ok()) {
@@ -79,14 +80,14 @@ struct UProbeTmpl {
 //       LOG(WARNING) << absl::StrCat("Could not update BPF map. Message=", s.msg());
 //     }
 //   }
-// 
+//
 //   void RemoveValue(TKeyType key) {
 //     if (shadow_keys_.contains(key)) {
 //       map_->remove_value(key);
 //       shadow_keys_.erase(key);
 //     }
 //   }
-// 
+//
 //  private:
 //   UserSpaceManagedBPFMap(bpf_tools::BCCWrapper* bcc, const std::string& map_name) {
 //     if constexpr (std::is_same_v<TMapType, ebpf::BPFMapInMapTable<TKeyType>>) {
@@ -95,7 +96,7 @@ struct UProbeTmpl {
 //       map_ = std::make_unique<TMapType>(bcc->GetHashTable<TKeyType, TValueType>(map_name));
 //     }
 //   }
-// 
+//
 //   std::unique_ptr<TMapType> map_;
 //   absl::flat_hash_set<TKeyType> shadow_keys_;
 // };
@@ -655,7 +656,8 @@ class UProbeManager {
   std::unique_ptr<WrappedBCCMap<uint32_t, struct go_common_symaddrs_t>> go_common_symaddrs_map_;
   std::unique_ptr<WrappedBCCMap<uint32_t, struct go_http2_symaddrs_t>> go_http2_symaddrs_map_;
   std::unique_ptr<WrappedBCCMap<uint32_t, struct go_tls_symaddrs_t>> go_tls_symaddrs_map_;
-  std::unique_ptr<WrappedBCCMap<uint32_t, struct node_tlswrap_symaddrs_t>> node_tlswrap_symaddrs_map_;
+  std::unique_ptr<WrappedBCCMap<uint32_t, struct node_tlswrap_symaddrs_t>>
+      node_tlswrap_symaddrs_map_;
   // Key is python gRPC module's md5 hash, value is the corresponding version enum's numeric value.
   std::unique_ptr<WrappedBCCMap<uint32_t, uint64_t>> grpc_c_versions_map_;
 

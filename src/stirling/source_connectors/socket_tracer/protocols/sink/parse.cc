@@ -40,7 +40,7 @@ namespace protocols {
 //                                          size_t start_pos, NoState* /*state*/) {
 //   return 0;
 // }
-// 
+//
 // template <>
 // ParseState ParseFrame(message_type_t type, std::string_view* buf, sink::Message* msg,
 //                       NoState* /*state*/) {
@@ -48,8 +48,8 @@ namespace protocols {
 //   return Status::OK();
 //   // return sink::ParseMessage(type, buf, msg);
 // }
-// 
-// }  // 
+//
+// }  //
 }  // namespace protocols
 }  // namespace stirling
 }  // namespace px

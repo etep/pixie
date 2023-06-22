@@ -37,13 +37,13 @@ namespace px {
 namespace stirling {
 
 class SocketTracerRecorder : public UnitConnector<SocketTraceConnector> {
-  public:
+ public:
   Status WritePProf() {
     RawPtr()->WriteProto();
     return Status::OK();
   }
 
-  private:
+ private:
 };
 
 }  // namespace stirling

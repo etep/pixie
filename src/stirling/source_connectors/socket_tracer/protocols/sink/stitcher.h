@@ -33,8 +33,8 @@ namespace protocols {
 
 template <>
 inline RecordsWithErrorCount<sink::Record> StitchFrames(std::deque<sink::Message>* req_messages,
-                                                         std::deque<sink::Message>* resp_messages,
-                                                         NoState* /* state */) {
+                                                        std::deque<sink::Message>* resp_messages,
+                                                        NoState* /* state */) {
   std::vector<sink::Record> records;
   sink::Record record;
   records.push_back(record);

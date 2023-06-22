@@ -22,7 +22,7 @@ package(default_visibility = ["//src/stirling:__subpackages__"])
 #     "//src/carnot:__subpackages__",
 #     "//src/vizier:__subpackages__",
 # ])
-# 
+#
 pl_proto_library(
     name = "rr_pl_proto",
     srcs = ["rr.proto"],

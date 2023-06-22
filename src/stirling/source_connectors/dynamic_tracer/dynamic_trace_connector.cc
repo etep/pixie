@@ -184,9 +184,12 @@ Status DynamicTraceConnector::InitImpl() {
       .name = bcc_program_.perf_buffer_specs.front().name,
       .probe_output_fn = &GenericHandleEvent,
       .probe_loss_fn = &GenericHandleEventLoss,
+      1024 * 1024,
+      bpf_tools::PerfBufferSizeCategory::kUncategorized,
+      this,
   };
 
-  PX_RETURN_IF_ERROR(OpenPerfBuffer(spec, this));
+  PX_RETURN_IF_ERROR(OpenPerfBuffer(spec));
 
   return Status::OK();
 }

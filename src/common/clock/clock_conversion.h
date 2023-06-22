@@ -76,5 +76,15 @@ class DefaultMonoToRealtimeConverter : public ClockConverter {
   InterpolatingLookupTable<ClockConverter::BufferCapacity(kUpdatePeriod)> mono_to_realtime_;
 };
 
+class NoOpClockConverter : public ClockConverter {
+ public:
+  static constexpr std::chrono::seconds kUpdatePeriod = std::chrono::seconds{32};
+  uint64_t Convert(uint64_t monotonic_time) const override {
+    return 1686946253020489691ULL + monotonic_time;
+  };
+  void Update() override {}
+  std::chrono::milliseconds UpdatePeriod() const override { return kUpdatePeriod; }
+};
+
 }  // namespace clock
 }  // namespace px

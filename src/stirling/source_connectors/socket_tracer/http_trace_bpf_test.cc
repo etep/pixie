@@ -66,7 +66,7 @@ TEST_F(GoHTTPTraceTest, RequestAndResponse) {
   // Uncomment to enable tracing:
   // FLAGS_stirling_conn_trace_pid = go_http_fixture_.server_pid();
 
-  if(!replay) {
+  if (!replay) {
     go_http_fixture_.LaunchGetClient();
   }
 
