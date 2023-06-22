@@ -491,8 +491,6 @@ StatusOr<T> ReplayBPFArrayTableGetValueEvent(const std::string& name, const int3
   PX_ASSIGN_OR_RETURN(auto event, GetReplayEventBPFArrayTableGetValueEvent(name, idx, sizeof(T)));
   const auto data = event.data();
   const auto data_size = data.size();
-  LOG(WARNING) << "ReplayBPFArrayTableGetValueEvent(), name: " << name
-               << ", data.size(): " << data_size << ".";
   memcpy(&value, data.data(), data_size);
   return value;
 }
