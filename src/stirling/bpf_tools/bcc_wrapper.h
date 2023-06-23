@@ -231,8 +231,13 @@ struct PerfEventSpec {
 /**
  * Wrapper around BCC, as a convenience.
  */
-class BCCWrapper {
+class BCCWrapper : public NotCopyMoveable {
  public:
+  static BCCWrapper& GetInstance() {
+    static BCCWrapper instance; // Guaranteed to be destroyed.
+    return instance;
+  }
+
   void SetRecordingMode();
   void SetReplayingMode();
 
@@ -412,6 +417,7 @@ class BCCWrapper {
   static size_t num_attached_perf_events() { return num_attached_perf_events_; }
 
  private:
+  BCCWrapper() {}
   FRIEND_TEST(BCCWrapperTest, DetachUProbe);
 
   Status DetachKProbe(const KProbeSpec& probe);

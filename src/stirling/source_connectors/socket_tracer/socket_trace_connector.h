@@ -89,7 +89,7 @@ enum TraceMode : int32_t {
   OnForNewerKernel = 2,
 };
 
-class SocketTraceConnector : public SourceConnector, public bpf_tools::BCCWrapper {
+class SocketTraceConnector : public SourceConnector {
  public:
   static constexpr std::string_view kName = "socket_tracer";
   static constexpr auto kTables =
@@ -162,6 +162,8 @@ class SocketTraceConnector : public SourceConnector, public bpf_tools::BCCWrappe
   }
 
  private:
+  bpf_tools::BCCWrapper& bcc_wrapper_;
+
   // ReadPerfBuffers poll callback functions (must be static).
   // These are used by the static variables below, and have to be placed here.
   static void HandleDataEvent(void* cb_cookie, void* data, int data_size);

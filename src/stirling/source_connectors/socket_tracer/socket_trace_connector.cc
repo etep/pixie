@@ -178,17 +178,18 @@ constexpr char openssl_mismatched_fds_help[] =
 
 SocketTraceConnector::SocketTraceConnector(std::string_view source_name)
     : SourceConnector(source_name, kTables),
+      bcc_wrapper_(bpf_tools::BCCWrapper::GetInstance()),
       conn_stats_(&conn_trackers_mgr_),
       openssl_trace_mismatched_fds_counter_family_(
           BuildCounterFamily(openssl_mismatched_fds_metric, openssl_mismatched_fds_help)),
-      uprobe_mgr_(this) {
+      uprobe_mgr_(&bcc_wrapper_) {
   proc_parser_ = std::make_unique<system::ProcParser>();
 }
 
 void SocketTraceConnector::InitProtocolTransferSpecs() {
 #define TRANSFER_STREAM_PROTOCOL(protocol_name)                                          \
-  IsRecording() ? &SocketTraceConnector::TransferStream<protocols::sink::ProtocolTraits> \
-                : &SocketTraceConnector::TransferStream<protocols::protocol_name::ProtocolTraits>
+  bcc_wrapper_.IsRecording() ? &SocketTraceConnector::TransferStream<protocols::sink::ProtocolTraits> \
+                             : &SocketTraceConnector::TransferStream<protocols::protocol_name::ProtocolTraits>
 
   // PROTOCOL_LIST: Requires update on new protocols.
 
@@ -421,14 +422,14 @@ Status SocketTraceConnector::InitBPF() {
       absl::StrCat("-DACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL=",
                    FLAGS_access_tls_socket_fd_via_syscall),
   };
-  PX_RETURN_IF_ERROR(InitBPFProgram(socket_trace_bcc_script, defines));
+  PX_RETURN_IF_ERROR(bcc_wrapper_.InitBPFProgram(socket_trace_bcc_script, defines));
 
-  PX_RETURN_IF_ERROR(AttachKProbes(kProbeSpecs));
+  PX_RETURN_IF_ERROR(bcc_wrapper_.AttachKProbes(kProbeSpecs));
   LOG(INFO) << absl::Substitute("Number of kprobes deployed = $0", kProbeSpecs.size());
   LOG(INFO) << "Probes successfully deployed.";
 
   const auto kPerfBufferSpecs = InitPerfBufferSpecs(this);
-  PX_RETURN_IF_ERROR(OpenPerfBuffers(kPerfBufferSpecs));
+  PX_RETURN_IF_ERROR(bcc_wrapper_.OpenPerfBuffers(kPerfBufferSpecs));
   LOG(INFO) << absl::Substitute("Number of perf buffers opened = $0", kPerfBufferSpecs.size());
   LOG(WARNING) << "SocketTraceConnector::InitBPF(): [a].";
 
@@ -506,7 +507,7 @@ Status SocketTraceConnector::InitImpl() {
   }
 
   // LOG(WARNING) << "SocketTraceConnector::InitImpl(): [h].";
-  conn_info_map_mgr_ = std::make_shared<ConnInfoMapManager>(this);
+  conn_info_map_mgr_ = std::make_shared<ConnInfoMapManager>(&bcc_wrapper_);
   // LOG(WARNING) << "SocketTraceConnector::InitImpl(): [i].";
   ConnTracker::SetConnInfoMapManager(conn_info_map_mgr_);
 
@@ -514,9 +515,9 @@ Status SocketTraceConnector::InitImpl() {
   uprobe_mgr_.Init(protocol_transfer_specs_[kProtocolHTTP2].enabled,
                    FLAGS_stirling_disable_self_tracing);
 
-  openssl_trace_state_ = WrappedBCCArrayTable<int>::Create(this, "openssl_trace_state");
+  openssl_trace_state_ = WrappedBCCArrayTable<int>::Create(&bcc_wrapper_, "openssl_trace_state");
   openssl_trace_state_debug_ = WrappedBCCMap<uint32_t, struct openssl_trace_state_debug_t>::Create(
-      this, "openssl_trace_state_debug");
+      &bcc_wrapper_, "openssl_trace_state_debug");
 
   return Status::OK();
 }
@@ -542,7 +543,7 @@ Status SocketTraceConnector::StopImpl() {
   // Must call Close() after attach_uprobes_thread_ has joined,
   // otherwise the two threads will cause concurrent accesses to BCC,
   // that will cause races and undefined behavior.
-  Close();
+  bcc_wrapper_.Close();
   return Status::OK();
 }
 
@@ -620,7 +621,7 @@ void SocketTraceConnector::UpdateCommonState(ConnectorContext* ctx) {
   // so raw data will be pushed to connection trackers more aggressively.
   // No data is lost, but this is a side-effect of sorts that affects timing of transfers.
   // It may be worth noting during debug.
-  PollPerfBuffers();
+  bcc_wrapper_.PollPerfBuffers();
 
   // Set-up current state for connection inference purposes.
   if (socket_info_mgr_ != nullptr) {
@@ -713,7 +714,7 @@ void SocketTraceConnector::TransferDataImpl(ConnectorContext* ctx) {
   if (sampling_freq_mgr_.count() % (kDebugDumpPeriod / kSamplingPeriod) == 0) {
     if (debug_level_ >= 1) {
       LOG(INFO) << "Context: " << DumpContext(ctx);
-      LOG(INFO) << "BPF map info: " << BPFMapsInfo(static_cast<BCCWrapper*>(this));
+      LOG(INFO) << "BPF map info: " << BPFMapsInfo(static_cast<bpf_tools::BCCWrapper*>(&bcc_wrapper_));
     }
   }
 
@@ -775,7 +776,7 @@ void SocketTraceConnector::TransferDataImpl(ConnectorContext* ctx) {
 Status SocketTraceConnector::UpdateBPFProtocolTraceRole(traffic_protocol_t protocol,
                                                         uint64_t role_mask) {
   // LOG(WARNING) << "SocketTraceConnector::UpdateBPFProtocolTraceRole(): [a].";
-  auto control_map_handle = WrappedBCCPerCPUArrayTable<uint64_t>::Create(this, kControlMapName);
+  auto control_map_handle = WrappedBCCPerCPUArrayTable<uint64_t>::Create(&bcc_wrapper_, kControlMapName);
   // LOG(WARNING) << "SocketTraceConnector::UpdateBPFProtocolTraceRole(): [b].";
   return control_map_handle->SetValues(static_cast<uint32_t>(protocol), role_mask);
   // return Status::OK();
@@ -795,13 +796,13 @@ Status SocketTraceConnector::TestOnlySetTargetPID() {
     FLAGS_stirling_conn_trace_pid = pid;
   }
   auto control_map_handle =
-      WrappedBCCPerCPUArrayTable<int64_t>::Create(this, kControlValuesArrayName);
+      WrappedBCCPerCPUArrayTable<int64_t>::Create(&bcc_wrapper_, kControlValuesArrayName);
   return control_map_handle->SetValues(kTargetTGIDIndex, pid);
 }
 
 Status SocketTraceConnector::DisableSelfTracing() {
   auto control_map_handle =
-      WrappedBCCPerCPUArrayTable<int64_t>::Create(this, kControlValuesArrayName);
+      WrappedBCCPerCPUArrayTable<int64_t>::Create(&bcc_wrapper_, kControlValuesArrayName);
   const int64_t self_pid = getpid();
   return control_map_handle->SetValues(kStirlingTGIDIndex, self_pid);
 }

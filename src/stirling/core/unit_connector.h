@@ -26,6 +26,7 @@
 #include "src/stirling/core/connector_context.h"
 #include "src/stirling/core/data_tables.h"
 #include "src/stirling/core/frequency_manager.h"
+#include "src/stirling/bpf_tools/bcc_wrapper.h"
 
 DEFINE_string(pids, "", "PIDs to profile, e.g. -pids 132,133. All processes profiled by default.");
 
@@ -161,10 +162,10 @@ class UnitConnector {
 
     source_ = T::Create("source_connector");
     if (record) {
-      source_->SetRecordingMode();
+      bpf_tools::BCCWrapper::GetInstance().SetRecordingMode();
     }
     if (replay) {
-      source_->SetReplayingMode();
+      bpf_tools::BCCWrapper::GetInstance().SetReplayingMode();
     }
 
     // Compile the eBPF program and create eBPF perf buffers and maps as needed.
@@ -280,7 +281,7 @@ class UnitConnector {
   Status TransferDataThread() {
     // Drain the perf buffers before starting the thread.
     // Otherwise, perf buffers may already be full, causing lost events and flaky test results.
-    source_->PollPerfBuffers();
+    bpf_tools::BCCWrapper::GetInstance().PollPerfBuffers();
 
     // Check to ensure that the transfer data thread will run within a human time frame.
     // If this is triggered, please find a new upper bound or implement a special case.

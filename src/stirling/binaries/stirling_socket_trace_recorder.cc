@@ -39,7 +39,7 @@ namespace stirling {
 class SocketTracerRecorder : public UnitConnector<SocketTraceConnector> {
  public:
   Status WritePProf() {
-    RawPtr()->WriteProto();
+    bpf_tools::BCCWrapper::GetInstance().WriteProto();
     return Status::OK();
   }
 

@@ -233,25 +233,25 @@ StatusOr<TaskStructOffsets> ResolveTaskStructOffsetsCore() {
                     .probe_fn = "task_struct_probe"};
 
   // Deploy the BPF program.
-  auto bcc = std::make_unique<px::stirling::bpf_tools::BCCWrapper>();
+  auto& bcc = bpf_tools::BCCWrapper::GetInstance();
   std::vector<std::string> cflags;
   // Important! Must tell BCCWrapper that we don't need linux headers, otherwise we may
   // enter an infinite loop if BCCWrapper tries to run the TaskStructResolver again.
   bool requires_linux_headers = false;
-  PX_RETURN_IF_ERROR(bcc->InitBPFProgram(bcc_script, cflags, requires_linux_headers));
-  PX_RETURN_IF_ERROR(bcc->AttachUProbe(uprobe));
+  PX_RETURN_IF_ERROR(bcc.InitBPFProgram(bcc_script, cflags, requires_linux_headers));
+  PX_RETURN_IF_ERROR(bcc.AttachUProbe(uprobe));
 
   // Trigger our uprobe.
   StirlingProbeTrigger();
 
   // Retrieve the task struct address from BPF map.
   auto task_struct_address_map =
-      WrappedBCCArrayTable<uint64_t>::Create(bcc.get(), "task_struct_address_map");
+      WrappedBCCArrayTable<uint64_t>::Create(&bcc, "task_struct_address_map");
   PX_ASSIGN_OR_RETURN(const uint64_t task_struct_addr, task_struct_address_map->GetValue(0));
 
   // Retrieve the raw memory buffer of the task struct.
   auto task_struct_buf_array =
-      WrappedBCCArrayTable<struct buf>::Create(bcc.get(), "task_struct_address_map");
+      WrappedBCCArrayTable<struct buf>::Create(&bcc, "task_struct_address_map");
   PX_ASSIGN_OR_RETURN(const struct buf buf, task_struct_buf_array->GetValue(0));
 
   // Analyze the raw data buffer for the patterns we are looking for.
@@ -354,15 +354,15 @@ StatusOr<uint64_t> ResolveTaskStructExitCodeOffset() {
   SubProcess proc;
   PX_RETURN_IF_ERROR(proc.Start([]() -> int { return exit_code; }, {.stop_before_exec = true}));
 
-  auto bcc = std::make_unique<px::stirling::bpf_tools::BCCWrapper>();
+  auto& bcc = bpf_tools::BCCWrapper::GetInstance();
   PX_RETURN_IF_ERROR(
-      bcc->InitBPFProgram(bcc_script, /*cflags*/ {}, /*requires_linux_headers*/ false));
-  PX_RETURN_IF_ERROR(bcc->AttachTracepoint({std::string("sched:sched_process_exit"),
-                                            std::string("tracepoint__sched__sched_process_exit")}));
+      bcc.InitBPFProgram(bcc_script, /*cflags*/ {}, /*requires_linux_headers*/ false));
+  PX_RETURN_IF_ERROR(bcc.AttachTracepoint({std::string("sched:sched_process_exit"),
+                                           std::string("tracepoint__sched__sched_process_exit")}));
 
   const std::string kProcExitTargetPIDTableName = "proc_exit_target_pid";
   auto proc_exit_target_pid_table =
-      WrappedBCCArrayTable<uint32_t>::Create(bcc.get(), kProcExitTargetPIDTableName);
+      WrappedBCCArrayTable<uint32_t>::Create(&bcc, kProcExitTargetPIDTableName);
 
   // Set target PID in BPF map, which only report event triggered by the launched subprocess.
   PX_RETURN_IF_ERROR(proc_exit_target_pid_table->SetValue(0, proc.child_pid()));
@@ -393,7 +393,7 @@ StatusOr<uint64_t> ResolveTaskStructExitCodeOffset() {
 
   // Retrieve the raw memory buffer of the task struct.
   auto task_struct_buf_array =
-      WrappedBCCArrayTable<struct buf>::Create(bcc.get(), "task_struct_buf");
+      WrappedBCCArrayTable<struct buf>::Create(&bcc, "task_struct_buf");
   PX_ASSIGN_OR_RETURN(const struct buf buf, task_struct_buf_array->GetValue(0));
   // if (!ebpf_st.ok()) {
   //   return error::Internal("Failed to read task_struct_buf, message: $0", ebpf_st.msg());
