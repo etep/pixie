@@ -29,7 +29,7 @@ namespace px {
 namespace system {
 using clock::ClockConverter;
 using clock::DefaultMonoToRealtimeConverter;
-using clock::NoOpClockConverter;
+//ing clock::NoOpClockConverter;
 
 DEFINE_string(sysfs_path, gflags::StringFromEnv("PL_SYSFS_PATH", "/sys/fs"),
               "The path to the sysfs directory.");
@@ -69,7 +69,7 @@ std::unique_ptr<Config> g_instance;
 
 const Config& Config::GetInstance() {
   if (g_instance == nullptr) {
-    ResetInstance(std::make_unique<NoOpClockConverter>());
+    ResetInstance(std::make_unique<DefaultMonoToRealtimeConverter>());
   }
   return *g_instance;
 }
@@ -78,7 +78,7 @@ void Config::ResetInstance(std::unique_ptr<ClockConverter> converter) {
   g_instance.reset(new Config(std::move(converter)));
 }
 
-void Config::ResetInstance() { Config::ResetInstance(std::make_unique<NoOpClockConverter>()); }
+void Config::ResetInstance() { Config::ResetInstance(std::make_unique<DefaultMonoToRealtimeConverter>()); }
 
 }  // namespace system
 }  // namespace px

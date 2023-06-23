@@ -642,13 +642,22 @@ void BCCWrapper::PollPerfBuffers(int timeout_ms) {
 }
 
 void BCCWrapper::Close() {
-  LOG(WARNING) << "BCCWrapper::Close()";
-  WriteProto();
-  DetachPerfEvents();
-  ClosePerfBuffers();
-  DetachKProbes();
-  DetachUProbes();
-  DetachTracepoints();
+  if (!closed_) {
+    closed_ = true;
+    LOG(WARNING) << "BCCWrapper::Close()";
+    LOG(WARNING) << "... [a] BCCWrapper::Close()";
+    WriteProto();
+    LOG(WARNING) << "... [b] BCCWrapper::Close()";
+    DetachPerfEvents();
+    LOG(WARNING) << "... [c] BCCWrapper::Close()";
+    ClosePerfBuffers();
+    LOG(WARNING) << "... [d] BCCWrapper::Close()";
+    DetachKProbes();
+    LOG(WARNING) << "... [e] BCCWrapper::Close()";
+    DetachUProbes();
+    LOG(WARNING) << "... [f] BCCWrapper::Close()";
+    DetachTracepoints();
+  }
 }
 
 }  // namespace bpf_tools

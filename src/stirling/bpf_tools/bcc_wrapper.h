@@ -234,8 +234,16 @@ struct PerfEventSpec {
 class BCCWrapper : public NotCopyMoveable {
  public:
   static BCCWrapper& GetInstance() {
-    static BCCWrapper instance; // Guaranteed to be destroyed.
-    return instance;
+    // static BCCWrapper instance; // Guaranteed to be destroyed.
+    // static std::unique_ptr<BCCWrapper> p = nullptr;
+    // if ( p == nullptr ) {
+    //   p = std::unique_ptr<BCCWrapper>(new BCCWrapper);
+    // }
+    static BCCWrapper* p = nullptr;
+    if (p == nullptr) {
+      p = new BCCWrapper;
+    }
+    return *p;
   }
 
   void SetRecordingMode();
@@ -418,6 +426,7 @@ class BCCWrapper : public NotCopyMoveable {
 
  private:
   BCCWrapper() {}
+  bool closed_ = false;
   FRIEND_TEST(BCCWrapperTest, DetachUProbe);
 
   Status DetachKProbe(const KProbeSpec& probe);

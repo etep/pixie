@@ -38,10 +38,10 @@ namespace stirling {
 
 class SocketTracerRecorder : public UnitConnector<SocketTraceConnector> {
  public:
-  Status WritePProf() {
-    bpf_tools::BCCWrapper::GetInstance().WriteProto();
-    return Status::OK();
-  }
+  // Status WritePProf() {
+  //   bpf_tools::BCCWrapper::GetInstance().WriteProto();
+  //   return Status::OK();
+  // }
 
  private:
 };
@@ -79,8 +79,8 @@ Status RunSocketTracer() {
   // Stop collecting data and do a final read out of eBPF perf buffer & maps.
   PX_RETURN_IF_ERROR(g_socket_tracer->Stop());
 
-  // Write a pprof proto file.
-  PX_RETURN_IF_ERROR(g_socket_tracer->WritePProf());
+  // // Write a pprof proto file.
+  // PX_RETURN_IF_ERROR(g_socket_tracer->WritePProf());
 
   // Phew. We are outta here.
   return Status::OK();
