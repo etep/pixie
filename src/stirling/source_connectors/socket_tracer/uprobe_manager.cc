@@ -62,7 +62,7 @@ using ::px::stirling::utils::KernelVersion;
 using ::px::stirling::utils::KernelVersionOrder;
 using ::px::system::ProcPidRootPath;
 
-UProbeManager::UProbeManager(bpf_tools::BCCWrapper* bcc) : bcc_(bcc) {
+UProbeManager::UProbeManager(bpf_tools::BCCWrapperBase* bcc) : bcc_(bcc) {
   proc_parser_ = std::make_unique<system::ProcParser>();
 }
 

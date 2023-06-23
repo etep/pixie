@@ -178,17 +178,17 @@ constexpr char openssl_mismatched_fds_help[] =
 
 SocketTraceConnector::SocketTraceConnector(std::string_view source_name)
     : SourceConnector(source_name, kTables),
-      bcc_wrapper_(bpf_tools::BCCWrapper::GetInstance()),
+      bcc_(bpf_tools::BCCWrapper::GetInstance()),
       conn_stats_(&conn_trackers_mgr_),
       openssl_trace_mismatched_fds_counter_family_(
           BuildCounterFamily(openssl_mismatched_fds_metric, openssl_mismatched_fds_help)),
-      uprobe_mgr_(&bcc_wrapper_) {
+      uprobe_mgr_(bcc_) {
   proc_parser_ = std::make_unique<system::ProcParser>();
 }
 
 void SocketTraceConnector::InitProtocolTransferSpecs() {
 #define TRANSFER_STREAM_PROTOCOL(protocol_name)                                          \
-  bcc_wrapper_.IsRecording() ? &SocketTraceConnector::TransferStream<protocols::sink::ProtocolTraits> \
+  bcc_->IsRecording() ? &SocketTraceConnector::TransferStream<protocols::sink::ProtocolTraits> \
                              : &SocketTraceConnector::TransferStream<protocols::protocol_name::ProtocolTraits>
 
   // PROTOCOL_LIST: Requires update on new protocols.
@@ -422,14 +422,14 @@ Status SocketTraceConnector::InitBPF() {
       absl::StrCat("-DACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL=",
                    FLAGS_access_tls_socket_fd_via_syscall),
   };
-  PX_RETURN_IF_ERROR(bcc_wrapper_.InitBPFProgram(socket_trace_bcc_script, defines));
+  PX_RETURN_IF_ERROR(bcc_->InitBPFProgram(socket_trace_bcc_script, defines));
 
-  PX_RETURN_IF_ERROR(bcc_wrapper_.AttachKProbes(kProbeSpecs));
+  PX_RETURN_IF_ERROR(bcc_->AttachKProbes(kProbeSpecs));
   LOG(INFO) << absl::Substitute("Number of kprobes deployed = $0", kProbeSpecs.size());
   LOG(INFO) << "Probes successfully deployed.";
 
   const auto kPerfBufferSpecs = InitPerfBufferSpecs(this);
-  PX_RETURN_IF_ERROR(bcc_wrapper_.OpenPerfBuffers(kPerfBufferSpecs));
+  PX_RETURN_IF_ERROR(bcc_->OpenPerfBuffers(kPerfBufferSpecs));
   LOG(INFO) << absl::Substitute("Number of perf buffers opened = $0", kPerfBufferSpecs.size());
   LOG(WARNING) << "SocketTraceConnector::InitBPF(): [a].";
 
@@ -543,7 +543,7 @@ Status SocketTraceConnector::StopImpl() {
   // Must call Close() after attach_uprobes_thread_ has joined,
   // otherwise the two threads will cause concurrent accesses to BCC,
   // that will cause races and undefined behavior.
-  bcc_wrapper_.Close();
+  bcc_->Close();
   return Status::OK();
 }
 
@@ -621,7 +621,7 @@ void SocketTraceConnector::UpdateCommonState(ConnectorContext* ctx) {
   // so raw data will be pushed to connection trackers more aggressively.
   // No data is lost, but this is a side-effect of sorts that affects timing of transfers.
   // It may be worth noting during debug.
-  bcc_wrapper_.PollPerfBuffers();
+  bcc_->PollPerfBuffers();
 
   // Set-up current state for connection inference purposes.
   if (socket_info_mgr_ != nullptr) {

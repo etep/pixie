@@ -37,13 +37,6 @@ namespace px {
 namespace stirling {
 
 class SocketTracerRecorder : public UnitConnector<SocketTraceConnector> {
- public:
-  // Status WritePProf() {
-  //   bpf_tools::BCCWrapper::GetInstance().WriteProto();
-  //   return Status::OK();
-  // }
-
- private:
 };
 
 }  // namespace stirling

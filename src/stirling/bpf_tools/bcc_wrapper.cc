@@ -382,23 +382,23 @@ bool recording_written_ = false;
 int playback_event_idx_ = 0;
 }  // namespace
 
-void BCCWrapper::SetRecordingMode() {
-  LOG(WARNING) << "BCCWrapper::SetRecordingMode()";
-  recording_ = true;
-}
-
-void BCCWrapper::SetReplayingMode() {
-  LOG(WARNING) << "BCCWrapper::SetReplayingMode()";
-  replaying_ = true;
-
-  char const* const pb_file_path = "/home/jps/src/pixielabs.ai/rra-pixie/bpf_events.pb";
-  std::fstream input(pb_file_path, std::ios::in | std::ios::binary);
-  if (!input) {
-    ECHECK(false) << "Could not open file: " << pb_file_path << ".";
-  } else if (!playback_events_.ParseFromIstream(&input)) {
-    ECHECK(false) << "Could not parse file: " << pb_file_path << ".";
-  }
-}
+// void BCCWrapper::SetRecordingMode() {
+//   LOG(WARNING) << "BCCWrapper::SetRecordingMode()";
+//   recording_ = true;
+// }
+// 
+// void BCCWrapper::SetReplayingMode() {
+//   LOG(WARNING) << "BCCWrapper::SetReplayingMode()";
+//   replaying_ = true;
+// 
+//   char const* const pb_file_path = "/home/jps/src/pixielabs.ai/rra-pixie/bpf_events.pb";
+//   std::fstream input(pb_file_path, std::ios::in | std::ios::binary);
+//   if (!input) {
+//     ECHECK(false) << "Could not open file: " << pb_file_path << ".";
+//   } else if (!playback_events_.ParseFromIstream(&input)) {
+//     ECHECK(false) << "Could not parse file: " << pb_file_path << ".";
+//   }
+// }
 
 void BCCWrapper::WriteProto() {
   if (recording_ && !recording_written_) {

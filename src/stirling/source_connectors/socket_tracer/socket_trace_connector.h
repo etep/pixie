@@ -162,7 +162,7 @@ class SocketTraceConnector : public SourceConnector {
   }
 
  private:
-  bpf_tools::BCCWrapper& bcc_wrapper_;
+  bpf_tools::BCCWrapperBase* bcc_;
 
   // ReadPerfBuffers poll callback functions (must be static).
   // These are used by the static variables below, and have to be placed here.

@@ -153,6 +153,8 @@ class UnitConnector {
 
   Status Init(absl::flat_hash_set<md::UPID> upids = {}, const bool record = false,
               const bool replay = false) {
+    PX_UNUSED(record);
+    PX_UNUSED(replay);
     if (upids.size() == 0) {
       // Enter this branch if Init() is called with no arguments (i.e. with a default empty set).
       // ParsePidsFlag() inspects the value in FLAGS_pids to find any pids the user specified
@@ -161,12 +163,12 @@ class UnitConnector {
     }
 
     source_ = T::Create("source_connector");
-    if (record) {
-      bpf_tools::BCCWrapper::GetInstance().SetRecordingMode();
-    }
-    if (replay) {
-      bpf_tools::BCCWrapper::GetInstance().SetReplayingMode();
-    }
+    // if (record) {
+    //   // bpf_tools::BCCWrapper::GetInstance().SetRecordingMode();
+    // }
+    // if (replay) {
+    //   // bpf_tools::BCCWrapper::GetInstance().SetReplayingMode();
+    // }
 
     // Compile the eBPF program and create eBPF perf buffers and maps as needed.
     PX_RETURN_IF_ERROR(source_->Init());
@@ -281,7 +283,7 @@ class UnitConnector {
   Status TransferDataThread() {
     // Drain the perf buffers before starting the thread.
     // Otherwise, perf buffers may already be full, causing lost events and flaky test results.
-    bpf_tools::BCCWrapper::GetInstance().PollPerfBuffers();
+    bpf_tools::BCCWrapper::GetInstance()->PollPerfBuffers();
 
     // Check to ensure that the transfer data thread will run within a human time frame.
     // If this is triggered, please find a new upper bound or implement a special case.
