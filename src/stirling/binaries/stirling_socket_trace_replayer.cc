@@ -107,7 +107,6 @@ Status RunSocketTracer() {
                                   schema.name());
     auto mgr = std::make_unique<px::stirling::InfoClassManager>(schema);
     mgr->SetSourceConnector(underyling_source);
-    // data_tables.push_back(mgr->data_table());
     info_class_mgrs_.push_back(std::move(mgr));
   }
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -123,7 +122,6 @@ Status RunSocketTracer() {
   //////////////////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
-  // Separate thread to periodically wake up and read the eBPF perf buffer & maps.
   PX_RETURN_IF_ERROR(g_socket_tracer->Start());
 
   // Run for specified amount of time.
