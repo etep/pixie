@@ -47,7 +47,7 @@ namespace stirling {
 using px::stirling::bpf_tools::WrappedBCCMap;
 using px::system::ProcPidPath;
 
-ConnInfoMapManager::ConnInfoMapManager(bpf_tools::BCCWrapper* bcc)
+ConnInfoMapManager::ConnInfoMapManager(bpf_tools::BCCWrapperBase* bcc)
     : conn_info_map_(WrappedBCCMap<uint64_t, struct conn_info_t>::Create(bcc, "conn_info_map")),
       conn_disabled_map_(WrappedBCCMap<uint64_t, uint64_t>::Create(bcc, "conn_disabled_map")) {
   std::filesystem::path self_path = GetSelfPath().ValueOrDie();

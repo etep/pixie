@@ -51,7 +51,7 @@ constexpr char kBCCProgram[] = R"(
 // but which have share the same file inode behind the scenes.
 // Disabling this test since this bug doesn't seem to reproduce with podman.
 TEST(BCCWrapper, DISABLED_UnexpectedExtraTrigger) {
-  BCCWrapper bcc_wrapper;
+  BCCWrapper& bcc_wrapper = *BCCWrapper::GetInstance();
   ASSERT_OK(bcc_wrapper.InitBPFProgram(kBCCProgram));
 
   ::px::stirling::testing::Go1_19_GRPCServerContainer server1;
@@ -83,7 +83,7 @@ TEST(BCCWrapper, DISABLED_UnexpectedExtraTrigger) {
 
   // We expect the probe to be triggered once, and it is.
   int trigger_count1;
-  bcc_wrapper.GetArrayTable<int>("count").get_value(0, trigger_count1);
+  bcc_wrapper.GetArrayTable<int>("count").GetValue(0, trigger_count1);
   ASSERT_EQ(trigger_count1, 1);
 
   // Now spawn a second server in a separate container, and attach a uprobe to it.

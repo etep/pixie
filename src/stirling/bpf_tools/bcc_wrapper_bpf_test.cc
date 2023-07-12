@@ -71,7 +71,7 @@ TEST(BCCWrapperTest, InitDefault) {
   // but since packaged headers are not included and PL_HOST_ENV is not defined,
   // it essentially boils down to a local headers search.
   // If the test host doesn't have Linux headers, we expect this test to fail.
-  BCCWrapper bcc_wrapper;
+  BCCWrapper& bcc_wrapper = *BCCWrapper::GetInstance();
   ASSERT_OK(bcc_wrapper.InitBPFProgram(kBCCProgram));
 }
 
@@ -88,7 +88,7 @@ TEST(BCCWrapperTest, InitWithTaskStructResolver) {
   bool requires_linux_headers = true;
   bool always_infer_task_struct_offsets = true;
 
-  BCCWrapper bcc_wrapper;
+  BCCWrapper& bcc_wrapper = *BCCWrapper::GetInstance();
   ASSERT_OK(bcc_wrapper.InitBPFProgram(kBCCProgram, cflags, requires_linux_headers,
                                        always_infer_task_struct_offsets));
 }

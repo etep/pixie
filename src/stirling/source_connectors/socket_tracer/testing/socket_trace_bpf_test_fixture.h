@@ -30,6 +30,7 @@
 #include "src/stirling/core/data_tables.h"
 #include "src/stirling/source_connectors/socket_tracer/socket_trace_connector.h"
 #include "src/stirling/testing/common.h"
+#include "src/stirling/core/unit_connector.h"
 
 namespace px {
 namespace stirling {
@@ -55,7 +56,7 @@ class SocketTraceBPFTestFixture : public ::testing::Test {
     source_.reset(dynamic_cast<SocketTraceConnector*>(source_connector.release()));
 
     LOG(WARNING) << "SocketTraceBPFTestFixture::SetUp(): [c].";
-    source_->SetReplayingMode();
+    // source_->SetReplayingMode();
 
     LOG(WARNING) << "SocketTraceBPFTestFixture::SetUp(): [d].";
     ASSERT_OK(source_->Init());
@@ -71,7 +72,10 @@ class SocketTraceBPFTestFixture : public ::testing::Test {
     LOG(WARNING) << "SocketTraceBPFTestFixture::SetUp(): [g].";
   }
 
-  void TearDown() override { ASSERT_OK(source_->Stop()); }
+  void TearDown() override {
+    ASSERT_OK(source_->Stop());
+    bpf_tools::BCCWrapper::ResetInstance();
+  }
 
   void ConfigureBPFCapture(traffic_protocol_t protocol, uint64_t role) {
     auto* socket_trace_connector = dynamic_cast<SocketTraceConnector*>(source_.get());

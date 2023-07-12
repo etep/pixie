@@ -121,6 +121,7 @@ class SocketTraceConnector : public SourceConnector {
   Status StopImpl() override;
   void InitContextImpl(ConnectorContext* ctx) override;
   void TransferDataImpl(ConnectorContext* ctx) override;
+  void PollPerfBuffers();
 
   void CheckTracerState();
 

@@ -57,22 +57,22 @@ class GoHTTPTraceTest : public SocketTraceBPFTestFixture</* TClientSideTracing *
 };
 
 TEST_F(GoHTTPTraceTest, RequestAndResponse) {
-  constexpr bool replay = true;
+  constexpr bool replay = false;
   constexpr int replay_pid = 305236;
   constexpr int replay_port = 36157;
 
   StartTransferDataThread();
 
   // Uncomment to enable tracing:
-  // FLAGS_stirling_conn_trace_pid = go_http_fixture_.server_pid();
+  FLAGS_stirling_conn_trace_pid = go_http_fixture_.server_pid();
 
   if (!replay) {
     go_http_fixture_.LaunchGetClient();
   }
 
   LOG(WARNING) << "Test here.";
-  // sleep(1);
-  // sleep(1);
+  sleep(1);
+  sleep(1);
   LOG(WARNING) << "Done.";
   StopTransferDataThread();
 

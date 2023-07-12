@@ -36,7 +36,7 @@ class ConnTrackersManager;
 
 class ConnInfoMapManager {
  public:
-  explicit ConnInfoMapManager(bpf_tools::BCCWrapper* bcc);
+  explicit ConnInfoMapManager(bpf_tools::BCCWrapperBase* bcc);
 
   void ReleaseResources(struct conn_id_t conn_id);
 
