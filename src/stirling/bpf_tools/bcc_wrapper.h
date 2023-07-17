@@ -460,10 +460,6 @@ class WrappedBCCArrayTable {
  public:
   using U = ebpf::BPFArrayTable<T>;
 
-  WrappedBCCArrayTable(bpf_tools::BCCWrapper* bcc, const std::string& name) : name_(name) {
-    underlying_ = std::make_unique<U>(bcc->BPF().get_array_table<T>(name_));
-  }
-
   static std::unique_ptr<WrappedBCCArrayTable> Create(bpf_tools::BCCWrapper* bcc,
                                                       const std::string& name) {
     return std::unique_ptr<WrappedBCCArrayTable>(new WrappedBCCArrayTable(bcc, name));
@@ -489,6 +485,10 @@ class WrappedBCCArrayTable {
   }
 
  private:
+  WrappedBCCArrayTable(bpf_tools::BCCWrapper* bcc, const std::string& name) : name_(name) {
+    underlying_ = std::make_unique<U>(bcc->BPF().get_array_table<T>(name_));
+  }
+
   const std::string name_;
   std::unique_ptr<U> underlying_;
 };
@@ -498,13 +498,9 @@ class WrappedBCCMap {
  public:
   using U = ebpf::BPFHashTable<K, V>;
 
-  WrappedBCCMap(bpf_tools::BCCWrapper* bcc, const std::string& name) : name_(name) {
-    underlying_ = std::make_unique<U>(bcc->BPF().get_hash_table<K, V>(name_));
-  }
-
-  static std::unique_ptr<WrappedBCCMap> Create(bpf_tools::BCCWrapper* bcc,
-                                               const std::string& name) {
-    return std::unique_ptr<WrappedBCCMap>(new WrappedBCCMap(bcc, name));
+  static std::unique_ptr<WrappedBCCMap> Create(bpf_tools::BCCWrapper* bcc, const std::string& name,
+                                               const bool user_space_managed = false) {
+    return std::unique_ptr<WrappedBCCMap>(new WrappedBCCMap(bcc, name, user_space_managed));
   }
 
   size_t capacity() const { return underlying_->capacity(); }
@@ -524,28 +520,39 @@ class WrappedBCCMap {
       return error::Internal(
           absl::Substitute("BCC failed to set value for array table: $0, key: $1.", name_, key));
     }
-    shadow_keys_.insert(key);
+    if (user_space_managed_) {
+      shadow_keys_.insert(key);
+    }
     return Status::OK();
   }
 
   Status RemoveValue(const K& key) {
-    if (shadow_keys_.contains(key)) {
-      const auto s = underlying_->remove_value(key);
-      if (!s.ok()) {
-        return error::Internal(absl::Substitute("BPF failed to remove value for key: $0.", key));
-      }
+    if (user_space_managed_ && !shadow_keys_.contains(key)) {
+      return Status::OK();
+    }
+    const auto s = underlying_->remove_value(key);
+    if (!s.ok()) {
+      return error::Internal(absl::Substitute("BPF failed to remove value for key: $0.", key));
+    }
+    if (user_space_managed_) {
       shadow_keys_.erase(key);
     }
     return Status::OK();
   }
 
-  absl::flat_hash_map<K, V> GetTableOffline(const bool clear_table = false) {
-    absl::flat_hash_map<K, V> r;
+  std::vector<std::pair<K, V>> GetTableOffline(const bool clear_table = false) {
+    if (!user_space_managed_) {
+      return underlying_->get_table_offline(clear_table);
+    }
 
+    // "r" our result.
+    std::vector<std::pair<K, V>> r;
+
+    // This is a user space managed map: we can iterate over the shadow keys.
     for (const auto& k : shadow_keys_) {
       auto s = GetValue(k);
       const auto v = s.ConsumeValueOrDie();
-      r[k] = v;
+      r.push_back({k, v});
       if (clear_table) {
         PX_UNUSED(underlying_->remove_value(k));
       }
@@ -557,7 +564,13 @@ class WrappedBCCMap {
   }
 
  private:
+  WrappedBCCMap(bpf_tools::BCCWrapper* bcc, const std::string& name, const bool user_space_managed)
+      : name_(name), user_space_managed_(user_space_managed) {
+    underlying_ = std::make_unique<U>(bcc->BPF().get_hash_table<K, V>(name_));
+  }
+
   const std::string name_;
+  const bool user_space_managed_;
   std::unique_ptr<U> underlying_;
   absl::flat_hash_set<K> shadow_keys_;
 };
@@ -566,10 +579,6 @@ template <typename T>
 class WrappedBCCPerCPUArrayTable {
  public:
   using U = ebpf::BPFPercpuArrayTable<T>;
-
-  WrappedBCCPerCPUArrayTable(bpf_tools::BCCWrapper* bcc, const std::string& name) : name_(name) {
-    underlying_ = std::make_unique<U>(bcc->BPF().get_percpu_array_table<T>(name_));
-  }
 
   static std::unique_ptr<WrappedBCCPerCPUArrayTable> Create(bpf_tools::BCCWrapper* bcc,
                                                             const std::string& name) {
@@ -587,6 +596,10 @@ class WrappedBCCPerCPUArrayTable {
   }
 
  private:
+  WrappedBCCPerCPUArrayTable(bpf_tools::BCCWrapper* bcc, const std::string& name) : name_(name) {
+    underlying_ = std::make_unique<U>(bcc->BPF().get_percpu_array_table<T>(name_));
+  }
+
   const std::string name_;
   std::unique_ptr<U> underlying_;
 };
@@ -594,10 +607,6 @@ class WrappedBCCPerCPUArrayTable {
 class WrappedBCCStackTable {
  public:
   using U = ebpf::BPFStackTable;
-
-  WrappedBCCStackTable(bpf_tools::BCCWrapper* bcc, const std::string& name) : name_(name) {
-    underlying_ = std::make_unique<U>(bcc->BPF().get_stack_table(name_));
-  }
 
   static std::unique_ptr<WrappedBCCStackTable> Create(bpf_tools::BCCWrapper* bcc,
                                                       const std::string& name) {
@@ -617,6 +626,10 @@ class WrappedBCCStackTable {
   U* RawPtr() { return underlying_.get(); }
 
  private:
+  WrappedBCCStackTable(bpf_tools::BCCWrapper* bcc, const std::string& name) : name_(name) {
+    underlying_ = std::make_unique<U>(bcc->BPF().get_stack_table(name_));
+  }
+
   const std::string name_;
   std::unique_ptr<U> underlying_;
 };
