@@ -652,7 +652,8 @@ void SocketTraceConnector::CheckTracerState() {
     return;
   }
 
-  const int error_code = (openssl_trace_state_->GetValue(kOpenSSLTraceStatusIdx)).ConsumeValueOr(0);
+  const int error_code =
+      (openssl_trace_state_->GetValue(kOpenSSLTraceStatusIdx)).ConsumeValueOr(kOpenSSLTraceOk);
 
   if (error_code == kOpenSSLMismatchedFDsDetected) {
     openssl_trace_mismatched_fds_counter_family_.Add({{"name", openssl_mismatched_fds_metric}})
