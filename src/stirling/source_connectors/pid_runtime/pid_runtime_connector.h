@@ -33,7 +33,7 @@
 namespace px {
 namespace stirling {
 
-class PIDRuntimeConnector : public SourceConnector, public bpf_tools::BCCWrapper {
+class PIDRuntimeConnector : public SourceConnector {
  public:
   using BPFMapDataT = bpf_tools::WrappedBCCMap<uint16_t, pidruntime_val_t>;
 

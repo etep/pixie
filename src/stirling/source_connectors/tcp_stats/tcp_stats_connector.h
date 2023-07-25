@@ -32,7 +32,7 @@
 namespace px {
 namespace stirling {
 
-class TCPStatsConnector : public SourceConnector, public bpf_tools::BCCWrapper {
+class TCPStatsConnector : public SourceConnector {
  public:
   static constexpr std::string_view kName = "tcp_stats";
   static constexpr auto kSamplingPeriod = std::chrono::milliseconds{1000};
@@ -54,10 +54,10 @@ class TCPStatsConnector : public SourceConnector, public bpf_tools::BCCWrapper {
   void TransferDataImpl(ConnectorContext* ctx) override;
 
  protected:
-  explicit TCPStatsConnector(std::string_view name)
-      : SourceConnector(name, kTables), bpf_tools::BCCWrapper() {}
+  explicit TCPStatsConnector(std::string_view name) : SourceConnector(name, kTables), bcc_(bpf_tools::BCCWrapper::GetInstance()) {}
 
  private:
+  bpf_tools::BCCWrapper& bcc_;
   std::vector<struct tcp_event_t> events_;
   TCPStats tcp_stats_;
 };

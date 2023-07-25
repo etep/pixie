@@ -69,8 +69,31 @@ namespace bpf_tools {
 /**
  * Wrapper around BCC, as a convenience.
  */
-class BCCWrapper {
+class BCCWrapper : public NotCopyMoveable {
+ private:
+  static std::unique_ptr<BCCWrapper> instance_;
+
  public:
+  // static void ResetInstance() {
+  //   instance_ = nullptr;
+  // }
+
+  static BCCWrapper& GetInstance() {
+    // if (instance_ == nullptr) {
+    //   instance_ = std::make_unique<BCCWrapper>();
+    // }
+    // return *instance_;
+
+    // static BCCWrapper *instance = nullptr;
+    // if (instance == nullptr) {
+    //   instance = new BCCWrapper;
+    // }
+    // return *instance;
+    
+    static BCCWrapper instance; // Guaranteed to be destroyed; instantiated on first use.
+    return instance;
+  }
+
   inline static const size_t kCPUCount = ebpf::BPFTable::get_possible_cpu_count();
 
   /**

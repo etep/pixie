@@ -32,7 +32,7 @@
 namespace px {
 namespace stirling {
 
-class DynamicTraceConnector : public SourceConnector, public bpf_tools::BCCWrapper {
+class DynamicTraceConnector : public SourceConnector {
  public:
   static constexpr auto kSamplingPeriod = std::chrono::milliseconds{100};
   static constexpr auto kPushPeriod = std::chrono::milliseconds{1000};

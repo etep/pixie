@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "src/common/base/statusor.h"
+#include "src/stirling/bpf_tools/bcc_wrapper.h"
 #include "src/stirling/core/connector_context.h"
 #include "src/stirling/core/data_tables.h"
 #include "src/stirling/core/frequency_manager.h"
@@ -248,7 +249,7 @@ class UnitConnector {
   Status TransferDataThread() {
     // Drain the perf buffers before starting the thread.
     // Otherwise, perf buffers may already be full, causing lost events and flaky test results.
-    source_->PollPerfBuffers();
+    ::px::stirling::bpf_tools::BCCWrapper::GetInstance().PollPerfBuffers();
 
     // Check to ensure that the transfer data thread will run within a human time frame.
     // If this is triggered, please find a new upper bound or implement a special case.

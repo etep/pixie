@@ -442,12 +442,15 @@ void BCCWrapper::PollPerfBuffers(int timeout_ms) {
 }
 
 void BCCWrapper::Close() {
+  LOG(WARNING) << "BCCWrapper::Close().";
   DetachPerfEvents();
   ClosePerfBuffers();
   DetachKProbes();
   DetachUProbes();
   DetachTracepoints();
 }
+
+// std::unique_ptr<BCCWrapper> BCCWrapper::instance_ = nullptr;
 
 }  // namespace bpf_tools
 }  // namespace stirling

@@ -49,7 +49,7 @@ namespace profiler {
 static constexpr std::string_view kNotSymbolizedMessage = "<not symbolized>";
 }  // namespace profiler
 
-class PerfProfileConnector : public SourceConnector, public bpf_tools::BCCWrapper {
+class PerfProfileConnector : public SourceConnector {
  public:
   static constexpr std::string_view kName = "perf_profiler";
   static constexpr auto kTables = MakeArray(kStackTraceTable);
@@ -77,6 +77,8 @@ class PerfProfileConnector : public SourceConnector, public bpf_tools::BCCWrappe
   utils::StatCounter<StatKey> stats() const { return stats_; }
 
  private:
+  bpf_tools::BCCWrapper& bcc_;
+
   // The time interval between stack trace samples, i.e. the sample rate used inside of BPF.
   const std::chrono::milliseconds stack_trace_sampling_period_;
 
