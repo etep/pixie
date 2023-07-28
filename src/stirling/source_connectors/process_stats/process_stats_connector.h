@@ -49,7 +49,7 @@ class ProcessStatsConnector : public SourceConnector {
     return std::unique_ptr<SourceConnector>(new ProcessStatsConnector(name));
   }
 
-  Status InitImpl() override;
+  Status InitImpl(bpf_tools::BCCWrapper*) override;
 
   Status StopImpl() override;
 

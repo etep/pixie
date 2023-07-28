@@ -21,7 +21,7 @@
 namespace px {
 namespace stirling {
 
-Status SeqGenConnector::InitImpl() {
+Status SeqGenConnector::InitImpl(bpf_tools::BCCWrapper*) {
   sampling_freq_mgr_.set_period(kSamplingPeriod);
   push_freq_mgr_.set_period(kPushPeriod);
   return Status::OK();

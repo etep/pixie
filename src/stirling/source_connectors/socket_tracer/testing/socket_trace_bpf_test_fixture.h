@@ -41,6 +41,8 @@ class SocketTraceBPFTestFixture : public ::testing::Test {
   void SetUp() override {
     FLAGS_stirling_disable_self_tracing = false;
 
+    bcc_ = std::make_unique<bpf_tools::BCCWrapperImpl>();
+
     // If client-side tracing is enabled, treat loopback as outside the cluster.
     // This will interpret localhost connections as leaving the cluster and tracing will apply.
     // WARNING: Do not use an if statement, because flags don't reset between successive tests.
@@ -51,7 +53,7 @@ class SocketTraceBPFTestFixture : public ::testing::Test {
     auto source_connector = SocketTraceConnector::Create("socket_trace_connector");
 
     source_.reset(dynamic_cast<SocketTraceConnector*>(source_connector.release()));
-    ASSERT_OK(source_->Init());
+    ASSERT_OK(source_->Init(bcc_.get()));
 
     source_->set_data_tables(data_tables_.tables());
 
@@ -86,7 +88,7 @@ class SocketTraceBPFTestFixture : public ::testing::Test {
   void StartTransferDataThread() {
     // Drain the perf buffers before starting the thread.
     // Otherwise, perf buffers may already be full, causing lost events and flaky test results.
-    source_->PollPerfBuffers();
+    source_->BCC().PollPerfBuffers();
 
     transfer_data_thread_ = std::thread([this]() {
       transfer_enable_ = true;
@@ -127,6 +129,7 @@ class SocketTraceBPFTestFixture : public ::testing::Test {
 
   absl::base_internal::SpinLock socket_tracer_state_lock_;
 
+  std::unique_ptr<bpf_tools::BCCWrapper> bcc_;
   std::unique_ptr<SocketTraceConnector> source_;
   std::unique_ptr<SystemWideStandaloneContext> ctx_;
   std::atomic<bool> transfer_enable_ = false;

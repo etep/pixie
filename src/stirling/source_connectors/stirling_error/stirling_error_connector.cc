@@ -25,7 +25,7 @@
 namespace px {
 namespace stirling {
 
-Status StirlingErrorConnector::InitImpl() {
+Status StirlingErrorConnector::InitImpl(bpf_tools::BCCWrapper*) {
   // Set Stirling start_time.
   pid_ = getpid();
   const std::string proc_pid_path = std::string("/proc/") + std::to_string(pid_);

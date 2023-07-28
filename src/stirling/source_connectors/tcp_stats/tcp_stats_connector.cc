@@ -65,25 +65,28 @@ const auto kPerfBufferSpecs = MakeArray<bpf_tools::PerfBufferSpec>({
      bpf_tools::PerfBufferSizeCategory::kData},
 });
 
-Status TCPStatsConnector::InitImpl() {
+Status TCPStatsConnector::InitImpl(bpf_tools::BCCWrapper* bcc) {
+  DCHECK(bcc_ == nullptr);
+  DCHECK(bcc != nullptr);
+  bcc_ = bcc;
   sampling_freq_mgr_.set_period(kSamplingPeriod);
   push_freq_mgr_.set_period(kPushPeriod);
-  PX_RETURN_IF_ERROR(InitBPFProgram(tcpstats_bcc_script));
-  PX_RETURN_IF_ERROR(AttachKProbes(kProbeSpecs));
-  PX_RETURN_IF_ERROR(OpenPerfBuffers(kPerfBufferSpecs, this));
+  PX_RETURN_IF_ERROR(bcc_->InitBPFProgram(tcpstats_bcc_script));
+  PX_RETURN_IF_ERROR(bcc_->AttachKProbes(kProbeSpecs));
+  PX_RETURN_IF_ERROR(bcc_->OpenPerfBuffers(kPerfBufferSpecs, this));
   LOG(INFO) << absl::Substitute("Successfully deployed $0 kprobes.", kProbeSpecs.size());
   return Status::OK();
 }
 
 Status TCPStatsConnector::StopImpl() {
-  Close();
+  bcc_->Close();
   return Status::OK();
 }
 
 void TCPStatsConnector::TransferDataImpl(ConnectorContext* ctx) {
   DCHECK_EQ(data_tables_.size(), 1U) << "Only one table is allowed per TCPStatsConnector.";
 
-  PollPerfBuffers();
+  bcc_->PollPerfBuffers();
 
   DataTable* data_table = data_tables_[0];
   auto* agg_stats = tcp_stats_.UpdateStats(events_);

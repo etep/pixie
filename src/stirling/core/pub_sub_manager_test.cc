@@ -117,7 +117,7 @@ class TestSourceConnector : public SourceConnector {
     return std::unique_ptr<SourceConnector>(new TestSourceConnector(name));
   }
 
-  Status InitImpl() override { return Status::OK(); }
+  Status InitImpl(bpf_tools::BCCWrapper*) override { return Status::OK(); }
   Status StopImpl() override { return Status::OK(); }
   void TransferDataImpl(ConnectorContext* /* ctx */) override{};
 
@@ -140,7 +140,7 @@ class TestSourceConnector2 : public SourceConnector {
     return std::unique_ptr<SourceConnector>(new TestSourceConnector2(name));
   }
 
-  Status InitImpl() override { return Status::OK(); }
+  Status InitImpl(bpf_tools::BCCWrapper*) override { return Status::OK(); }
   Status StopImpl() override { return Status::OK(); }
   void TransferDataImpl(ConnectorContext* /* ctx */) override{};
 

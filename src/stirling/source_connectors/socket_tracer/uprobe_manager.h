@@ -76,7 +76,7 @@ class UProbeManager {
    * Construct a UProbeManager.
    * @param bcc A pointer to a BCCWrapper instance that is used to deploy uprobes.
    */
-  explicit UProbeManager(bpf_tools::BCCWrapper* bcc);
+  explicit UProbeManager();
 
   /**
    * Mandatory initialization step before RunDeployUprobesThread can be called.
@@ -85,8 +85,7 @@ class UProbeManager {
    * @param enable_http2_tracing Whether to enable HTTP2 tracing.
    * @param disable_self_tracing Whether to enable uprobe deployment on Stirling itself.
    */
-  void Init(bool disable_go_tls_tracing, bool enable_http2_tracing,
-            bool disable_self_tracing = true);
+  void Init(bpf_tools::BCCWrapper* bcc, bool disable_go_tls_tracing, bool enable_http2_tracing, bool disable_self_tracing = true);
 
   /**
    * Notify uprobe manager of an mmap event. An mmap may be indicative of a dlopen,
@@ -594,7 +593,7 @@ class UProbeManager {
   // Note that BPF maps can fill up if this is not done.
   void CleanupPIDMaps(const absl::flat_hash_set<md::UPID>& deleted_upids);
 
-  bpf_tools::BCCWrapper* bcc_;
+  bpf_tools::BCCWrapper* bcc_ = nullptr;
 
   // Whether to try to uprobe ourself (e.g. for OpenSSL). Typically, we don't want to do that.
   bool cfg_disable_self_probing_;

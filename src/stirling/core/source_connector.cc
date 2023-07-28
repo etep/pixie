@@ -27,13 +27,13 @@
 namespace px {
 namespace stirling {
 
-Status SourceConnector::Init() {
+Status SourceConnector::Init(bpf_tools::BCCWrapper* bcc) {
   if (state_ != State::kUninitialized) {
     return error::Internal("Cannot re-initialize a connector [current state = $0].",
                            magic_enum::enum_name(static_cast<State>(state_)));
   }
   LOG(INFO) << absl::Substitute("Initializing source connector: $0", name());
-  Status s = InitImpl();
+  Status s = InitImpl(bcc);
   state_ = s.ok() ? State::kActive : State::kErrors;
 
   DCHECK_NE(sampling_freq_mgr_.period().count(), 0) << "Sampling period has not been initialized";

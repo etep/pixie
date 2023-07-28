@@ -28,6 +28,7 @@
 
 using ::px::stirling::GetSelfPath;
 using ::px::stirling::bpf_tools::BCCWrapper;
+using ::px::stirling::bpf_tools::BCCWrapperImpl;
 using ::px::stirling::bpf_tools::BPFProbeAttachType;
 using ::px::stirling::bpf_tools::UProbeSpec;
 using ::px::stirling::bpf_tools::WrappedBCCMap;
@@ -102,7 +103,7 @@ void SetupPopulateProbe(BCCWrapper* bcc) {
 
 // NOLINTNEXTLINE : runtime/references.
 static void BM_userspace_update_remove(benchmark::State& state) {
-  BCCWrapper bcc_wrapper;
+  BCCWrapperImpl bcc_wrapper;
   std::string_view kProgram = "BPF_HASH(map, int, int);";
   PX_CHECK_OK(bcc_wrapper.InitBPFProgram(kProgram));
   auto bpf_map = WrappedBCCMap<int, int>::Create(&bcc_wrapper, "map");
@@ -124,7 +125,7 @@ static void BM_userspace_update_remove(benchmark::State& state) {
 
 // NOLINTNEXTLINE : runtime/references.
 static void BM_bpf_triggered_update_remove(benchmark::State& state) {
-  BCCWrapper bcc_wrapper;
+  BCCWrapperImpl bcc_wrapper;
   std::string_view kProgram = R"(
 #include <linux/ptrace.h>
 
@@ -192,7 +193,7 @@ int map_populate_uprobe(struct pt_regs* ctx) {
 
 // NOLINTNEXTLINE : runtime/references.
 static void BM_userspace_update_get_remove(benchmark::State& state) {
-  BCCWrapper bcc_wrapper;
+  BCCWrapperImpl bcc_wrapper;
   std::string_view kProgram = "BPF_HASH(map, int, int);";
   PX_CHECK_OK(bcc_wrapper.InitBPFProgram(kProgram));
   auto bpf_map = WrappedBCCMap<int, int>::Create(&bcc_wrapper, "map");
@@ -217,7 +218,7 @@ static void BM_userspace_update_get_remove(benchmark::State& state) {
 
 // NOLINTNEXTLINE : runtime/references.
 static void BM_bpf_triggered_update_get_remove(benchmark::State& state) {
-  BCCWrapper bcc_wrapper;
+  BCCWrapperImpl bcc_wrapper;
   std::string_view kProgram = R"(
 #include <linux/ptrace.h>
 

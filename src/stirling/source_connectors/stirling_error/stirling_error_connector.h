@@ -48,7 +48,7 @@ class StirlingErrorConnector : public SourceConnector {
     return std::unique_ptr<SourceConnector>(new StirlingErrorConnector(name));
   }
 
-  Status InitImpl() override;
+  Status InitImpl(bpf_tools::BCCWrapper*) override;
   Status StopImpl() override;
 
   void TransferDataImpl(ConnectorContext* ctx) override;

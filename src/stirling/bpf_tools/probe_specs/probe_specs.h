@@ -177,6 +177,26 @@ struct PerfBufferSpec {
   // to count this buffer's size against.
   PerfBufferSizeCategory size_category = PerfBufferSizeCategory::kUncategorized;
 
+  void* cb_cookie = nullptr;
+
+  // PerfBufferSpec(const std::string &n, perf_reader_raw_cb x, perf_reader_lost_cb y, const int s, const PerfBufferSizeCategory z, void *cb) :
+  //   name(n),
+  //   probe_output_fn(x),
+  //   probe_loss_fn(y),
+  //   size_bytes(s),
+  //   size_category(z),
+  //   cb_cookie(cb) {
+  // }
+  // 
+  // PerfBufferSpec(const PerfBufferSpec& other) {
+  //   name = other.name;
+  //   probe_output_fn = other.probe_output_fn;
+  //   probe_loss_fn = other.probe_loss_fn;
+  //   size_bytes = other.size_bytes;
+  //   size_category = other.size_category;
+  //   cb_cookie = other.cb_cookie;
+  // }
+  
   std::string ToString() const {
     return absl::Substitute("name=$0 size_bytes=$1 size_category=$2", name, size_bytes,
                             magic_enum::enum_name(size_category));

@@ -32,7 +32,7 @@ namespace stirling {
 
 using system::ProcParser;
 
-Status ProcessStatsConnector::InitImpl() {
+Status ProcessStatsConnector::InitImpl(bpf_tools::BCCWrapper*) {
   sampling_freq_mgr_.set_period(kSamplingPeriod);
   push_freq_mgr_.set_period(kPushPeriod);
   return Status::OK();

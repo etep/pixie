@@ -62,12 +62,14 @@ using ::px::stirling::utils::KernelVersion;
 using ::px::stirling::utils::KernelVersionOrder;
 using ::px::system::ProcPidRootPath;
 
-UProbeManager::UProbeManager(bpf_tools::BCCWrapper* bcc) : bcc_(bcc) {
+UProbeManager::UProbeManager() {
   proc_parser_ = std::make_unique<system::ProcParser>();
 }
 
-void UProbeManager::Init(bool disable_go_tls_tracing, bool enable_http2_tracing,
-                         bool disable_self_probing) {
+void UProbeManager::Init(bpf_tools::BCCWrapper* bcc, bool disable_go_tls_tracing, bool enable_http2_tracing, bool disable_self_probing) {
+  DCHECK(bcc != nullptr);
+  DCHECK(bcc_ == nullptr);
+  bcc_ = bcc;
   cfg_disable_go_tls_tracing_ = disable_go_tls_tracing;
   cfg_enable_http2_tracing_ = enable_http2_tracing;
   cfg_disable_self_probing_ = disable_self_probing;

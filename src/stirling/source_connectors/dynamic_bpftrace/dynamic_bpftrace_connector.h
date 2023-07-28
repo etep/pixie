@@ -45,7 +45,7 @@ class DynamicBPFTraceConnector : public SourceConnector {
   explicit DynamicBPFTraceConnector(std::string_view source_name,
                                     std::unique_ptr<DynamicDataTableSchema> table_schema,
                                     std::unique_ptr<bpf_tools::BPFTraceWrapper> bpftrace);
-  Status InitImpl() override;
+  Status InitImpl(bpf_tools::BCCWrapper*) override;
   Status StopImpl() override;
   void TransferDataImpl(ConnectorContext* ctx) override;
 

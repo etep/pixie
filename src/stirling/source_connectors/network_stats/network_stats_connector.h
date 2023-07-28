@@ -49,7 +49,7 @@ class NetworkStatsConnector : public SourceConnector {
     return std::unique_ptr<SourceConnector>(new NetworkStatsConnector(name));
   }
 
-  Status InitImpl() override;
+  Status InitImpl(bpf_tools::BCCWrapper*) override;
 
   Status StopImpl() override;
 

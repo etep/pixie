@@ -34,7 +34,7 @@ OBJ_STRVIEW(kPIDRuntimeBTScript, bpftrace_pidruntime);
 namespace px {
 namespace stirling {
 
-Status PIDCPUUseBPFTraceConnector::InitImpl() {
+Status PIDCPUUseBPFTraceConnector::InitImpl(bpf_tools::BCCWrapper*) {
   sampling_freq_mgr_.set_period(kSamplingPeriod);
   push_freq_mgr_.set_period(kPushPeriod);
 

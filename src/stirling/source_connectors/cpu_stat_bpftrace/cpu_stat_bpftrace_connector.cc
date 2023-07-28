@@ -33,7 +33,7 @@ OBJ_STRVIEW(kCPUStatBTScript, cpustat);
 namespace px {
 namespace stirling {
 
-Status CPUStatBPFTraceConnector::InitImpl() {
+Status CPUStatBPFTraceConnector::InitImpl(bpf_tools::BCCWrapper*) {
   sampling_freq_mgr_.set_period(kSamplingPeriod);
   push_freq_mgr_.set_period(kPushPeriod);
 

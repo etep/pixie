@@ -128,7 +128,7 @@ class SeqGenConnector : public SourceConnector {
         rng_(37) {}
   ~SeqGenConnector() override = default;
 
-  Status InitImpl() override;
+  Status InitImpl(bpf_tools::BCCWrapper*) override;
 
   void TransferDataImpl(ConnectorContext* ctx) override;
 

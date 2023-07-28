@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "src/common/base/statusor.h"
+#include "src/stirling/bpf_tools/bcc_wrapper.h"
 #include "src/stirling/core/connector_context.h"
 #include "src/stirling/core/data_tables.h"
 #include "src/stirling/core/frequency_manager.h"
@@ -32,12 +33,16 @@ DEFINE_string(pids, "", "PIDs to profile, e.g. -pids 132,133. All processes prof
 namespace px {
 namespace stirling {
 
-template <typename T>
+template <typename T, typename B = bpf_tools::BCCWrapperImpl>
 class UnitConnector {
   using time_point = std::chrono::steady_clock::time_point;
 
  public:
-  UnitConnector() : data_tables_(T::kTables) {}
+  UnitConnector() : data_tables_(T::kTables) {
+    auto f = [](uint64_t, px::types::TabletID,
+                std::unique_ptr<px::types::ColumnWrapperRecordBatch>) { return Status::OK(); };
+    data_push_callback_ = f;
+  }
 
   ~UnitConnector() {
     if (started_ && !stopped_) {
@@ -49,6 +54,11 @@ class UnitConnector {
 
     // Invokes dtor of the underlying source connector.
     source_ = nullptr;
+  }
+
+  Status RegisterDataPushCallback(DataPushCallback f) {
+    data_push_callback_ = f;
+    return Status::OK();
   }
 
   Status Stop() {
@@ -111,6 +121,11 @@ class UnitConnector {
     return Status::OK();
   }
 
+  Status SetSamplingPeriod(std::chrono::milliseconds period) {
+    source_->sampling_freq_mgr().set_period(period);
+    return Status::OK();
+  }
+
   Status ResetConnectorContext(absl::flat_hash_set<md::UPID> upids) {
     // Stop transferring data.
     PX_RETURN_IF_ERROR(StopTransferDataThread());
@@ -138,7 +153,8 @@ class UnitConnector {
     source_ = T::Create("source_connector");
 
     // Compile the eBPF program and create eBPF perf buffers and maps as needed.
-    PX_RETURN_IF_ERROR(source_->Init());
+    bcc_ = std::make_unique<B>();
+    PX_RETURN_IF_ERROR(source_->Init(bcc_.get()));
 
     if (upids.size() == 0) {
       // The upids set is empty: trace all processes and use automatic context refresh.
@@ -248,7 +264,7 @@ class UnitConnector {
   Status TransferDataThread() {
     // Drain the perf buffers before starting the thread.
     // Otherwise, perf buffers may already be full, causing lost events and flaky test results.
-    source_->PollPerfBuffers();
+    source_->BCC().PollPerfBuffers();
 
     // Check to ensure that the transfer data thread will run within a human time frame.
     // If this is triggered, please find a new upper bound or implement a special case.
@@ -260,9 +276,12 @@ class UnitConnector {
       const auto t0 = std::chrono::steady_clock::now();
       ctx_->RefreshUPIDList();
       source_->TransferData(ctx_.get());
+      source_->PushData(data_push_callback_);
       const auto t1 = std::chrono::steady_clock::now();
       const auto t_elapsed = t1 - t0;
-      std::this_thread::sleep_for(source_->sampling_freq_mgr().period() - t_elapsed);
+      if (source_->sampling_freq_mgr().period() > t_elapsed) {
+        std::this_thread::sleep_for(source_->sampling_freq_mgr().period() - t_elapsed);
+      }
     }
     transfer_exited_ = true;
 
@@ -280,7 +299,7 @@ class UnitConnector {
     transfer_enable_ = true;
 
     // Create a thread to periodically read eBPF data.
-    transfer_data_thread_ = std::thread(&UnitConnector<T>::TransferDataThread, this);
+    transfer_data_thread_ = std::thread(&UnitConnector<T, B>::TransferDataThread, this);
 
     return Status::OK();
   }
@@ -333,6 +352,9 @@ class UnitConnector {
   // the invoking program will call ConsumeRecords() and data will be aggregated into the
   // data table schema(s) and this vector of tablets will be populated.
   std::vector<TaggedRecordBatch> tablets_;
+
+  std::unique_ptr<bpf_tools::BCCWrapper> bcc_;
+  DataPushCallback data_push_callback_;
 };
 
 }  // namespace stirling

@@ -28,18 +28,21 @@ OBJ_STRVIEW(pidruntime_bcc_script, pidruntime);
 namespace px {
 namespace stirling {
 
-Status PIDRuntimeConnector::InitImpl() {
+Status PIDRuntimeConnector::InitImpl(bpf_tools::BCCWrapper* bcc) {
+  DCHECK(bcc_ == nullptr);
+  DCHECK(bcc != nullptr);
+  bcc_ = bcc;
   sampling_freq_mgr_.set_period(kSamplingPeriod);
   push_freq_mgr_.set_period(kPushPeriod);
-  PX_RETURN_IF_ERROR(InitBPFProgram(pidruntime_bcc_script));
-  PX_RETURN_IF_ERROR(AttachSamplingProbes(kSamplingProbes));
+  PX_RETURN_IF_ERROR(bcc_->InitBPFProgram(pidruntime_bcc_script));
+  PX_RETURN_IF_ERROR(bcc_->AttachSamplingProbes(kSamplingProbes));
 
-  bpf_data_ = BPFMapDataT::Create(this, "pid_cpu_time");
+  bpf_data_ = BPFMapDataT::Create(bcc_, "pid_cpu_time");
   return Status::OK();
 }
 
 Status PIDRuntimeConnector::StopImpl() {
-  Close();
+  bcc_->Close();
   return Status::OK();
 }
 

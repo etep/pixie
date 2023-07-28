@@ -163,7 +163,7 @@ class StringifierTest : public ::testing::Test {
 
   uint64_t num_stack_ids_reused_ = 0;
 
-  bpf_tools::BCCWrapper bcc_wrapper_;
+  bpf_tools::BCCWrapperImpl bcc_wrapper_;
   std::unique_ptr<WrappedBCCStackTable> stack_traces_;
   std::unique_ptr<Histogram> histogram_;
 

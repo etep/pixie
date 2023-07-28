@@ -28,6 +28,7 @@
 
 #include "src/common/testing/testing.h"
 #include "src/stirling/core/data_tables.h"
+#include "src/stirling/bpf_tools/bcc_wrapper.h"
 #include "src/stirling/source_connectors/tcp_stats/tcp_stats_connector.h"
 #include "src/stirling/testing/common.h"
 
@@ -40,7 +41,7 @@ class TcpTraceBPFTestFixture : public ::testing::Test {
   void SetUp() override {
     auto source_connector = TCPStatsConnector::Create("tcp_stats");
     source_.reset(dynamic_cast<TCPStatsConnector*>(source_connector.release()));
-    ASSERT_OK(source_->Init());
+    ASSERT_OK(source_->Init(new bpf_tools::BCCWrapperImpl()));
     source_->set_data_tables(data_tables_.tables());
     ctx_ = std::make_unique<SystemWideStandaloneContext>();
   }
@@ -52,7 +53,7 @@ class TcpTraceBPFTestFixture : public ::testing::Test {
     // Otherwise, perf buffers may already be full, causing lost events and flaky test results.
     ASSERT_TRUE(source_ != nullptr);
 
-    source_->PollPerfBuffers();
+    source_->BCC().PollPerfBuffers();
 
     transfer_data_thread_ = std::thread([this]() {
       transfer_enable_ = true;

@@ -29,6 +29,7 @@
 #include "src/stirling/core/data_table.h"
 #include "src/stirling/core/frequency_manager.h"
 #include "src/stirling/core/info_class_manager.h"
+#include "src/stirling/bpf_tools/bcc_wrapper.h"
 
 /**
  * These are the steps to follow to add a new data source connector.
@@ -54,7 +55,7 @@ class SourceConnector : public NotCopyable {
    * Initializes the source connector. Can only be called once.
    * @return Status of whether initialization was successful.
    */
-  Status Init();
+  Status Init(bpf_tools::BCCWrapper* bcc = nullptr);
 
   /**
    * Sets the initial context for the source connector.
@@ -133,7 +134,7 @@ class SourceConnector : public NotCopyable {
                            const ArrayView<DataTableSchema>& table_schemas)
       : source_name_(source_name), table_schemas_(table_schemas) {}
 
-  virtual Status InitImpl() = 0;
+  virtual Status InitImpl(bpf_tools::BCCWrapper * /* bcc */ ) = 0;
 
   // Provide a default InitContextImpl which does nothing.
   // SourceConnectors only need override if action is required on the initial context.

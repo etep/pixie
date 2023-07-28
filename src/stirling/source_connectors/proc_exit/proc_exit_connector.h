@@ -35,7 +35,7 @@ namespace stirling {
 namespace proc_exit_tracer {
 
 // This connector is not registered yet, so it has no effect.
-class ProcExitConnector : public SourceConnector, public bpf_tools::BCCWrapper {
+class ProcExitConnector : public SourceConnector {
  public:
   static constexpr std::string_view kName = "proc_exit_tracer";
 
@@ -56,7 +56,7 @@ class ProcExitConnector : public SourceConnector, public bpf_tools::BCCWrapper {
  protected:
   explicit ProcExitConnector(std::string_view name);
 
-  Status InitImpl() override;
+  Status InitImpl(bpf_tools::BCCWrapper*) override;
   void TransferDataImpl(ConnectorContext* ctx) override;
   Status StopImpl() override { return Status::OK(); }
 
@@ -68,6 +68,8 @@ class ProcExitConnector : public SourceConnector, public bpf_tools::BCCWrapper {
   void UpdateCrashedJavaProcCounters(
       uint32_t asid, const proc_exit_event_t& event,
       const absl::flat_hash_map<md::UPID, md::PIDInfoUPtr>& upid_pid_info_map);
+
+  bpf_tools::BCCWrapper* bcc_;
 
   prometheus::Counter& java_proc_crashed_counter_;
   prometheus::Counter& java_proc_crashed_with_profiler_counter_;

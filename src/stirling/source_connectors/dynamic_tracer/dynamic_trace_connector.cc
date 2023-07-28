@@ -169,14 +169,17 @@ StatusOr<std::unique_ptr<SourceConnector>> DynamicTraceConnector::Create(
       new DynamicTraceConnector(name, std::move(table_schema), std::move(bcc_program)));
 }
 
-Status DynamicTraceConnector::InitImpl() {
+Status DynamicTraceConnector::InitImpl(bpf_tools::BCCWrapper* bcc) {
+  DCHECK(bcc != nullptr);
+  DCHECK(bcc_ == nullptr);
+  bcc_ = bcc;
   sampling_freq_mgr_.set_period(kSamplingPeriod);
   push_freq_mgr_.set_period(kPushPeriod);
 
-  PX_RETURN_IF_ERROR(InitBPFProgram(bcc_program_.code));
+  PX_RETURN_IF_ERROR(bcc_->InitBPFProgram(bcc_program_.code));
 
   for (const auto& uprobe_spec : bcc_program_.uprobe_specs) {
-    PX_RETURN_IF_ERROR(AttachUProbe(uprobe_spec));
+    PX_RETURN_IF_ERROR(bcc_->AttachUProbe(uprobe_spec));
   }
 
   // TODO(yzhao/oazizi): Might need to change this if we need to support multiple perf buffers.
@@ -184,9 +187,10 @@ Status DynamicTraceConnector::InitImpl() {
       .name = bcc_program_.perf_buffer_specs.front().name,
       .probe_output_fn = &GenericHandleEvent,
       .probe_loss_fn = &GenericHandleEventLoss,
+      .cb_cookie = this,
   };
 
-  PX_RETURN_IF_ERROR(OpenPerfBuffer(spec, this));
+  PX_RETURN_IF_ERROR(bcc_->OpenPerfBuffer(spec));
 
   return Status::OK();
 }
@@ -494,7 +498,7 @@ void DynamicTraceConnector::TransferDataImpl(ConnectorContext* ctx) {
     return;
   }
 
-  PollPerfBuffers();
+  bcc_->PollPerfBuffers();
 
   for (const auto& item : data_items_) {
     // TODO(yzhao): Right now only support scalar types. We should replace type with ScalarType

@@ -36,7 +36,7 @@ DEFINE_int32(
 namespace px {
 namespace stirling {
 
-Status JVMStatsConnector::InitImpl() {
+Status JVMStatsConnector::InitImpl(bpf_tools::BCCWrapper*) {
   sampling_freq_mgr_.set_period(kSamplingPeriod);
   push_freq_mgr_.set_period(kPushPeriod);
   return Status::OK();

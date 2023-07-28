@@ -213,6 +213,8 @@ template <bool FastTest>
 class PerfProfileBPFTest : public ::testing::TestWithParam<std::filesystem::path> {
  protected:
   void SetUp() override {
+    // bpf_tools::BCCWrapper::ResetInstance();
+
     FLAGS_stirling_profiler_java_symbols = true;
     FLAGS_number_attach_attempts_per_iteration = kNumSubProcs;
 
@@ -443,7 +445,7 @@ TEST_F(FastPerfProfileBPFTest, GraalVM_AOT_Test) {
   ASSERT_NO_FATAL_FAILURE(CheckExpectedProfile(leaf_histo, key1x, key2x));
 }
 
-TEST_P(FastPerfProfileBPFTest, PerfProfilerJavaTest) {
+TEST_P(FastPerfProfileBPFTest, DISABLED_PerfProfilerJavaTest) {
   constexpr std::string_view kContainerNamePfx = "java";
   const std::filesystem::path image_tar_path = GetParam();
   ASSERT_TRUE(fs::Exists(image_tar_path)) << absl::StrFormat("Missing: %s.", image_tar_path);

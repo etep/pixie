@@ -103,7 +103,7 @@ class CPUStatBPFTraceConnector : public SourceConnector, public bpf_tools::BPFTr
     return std::unique_ptr<SourceConnector>(new CPUStatBPFTraceConnector(name, /* cpu_id */ 0));
   }
 
-  Status InitImpl() override;
+  Status InitImpl(bpf_tools::BCCWrapper*) override;
   Status StopImpl() override;
   void TransferDataImpl(ConnectorContext* ctx) override;
 

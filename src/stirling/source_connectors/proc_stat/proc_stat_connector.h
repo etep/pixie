@@ -57,7 +57,7 @@ class ProcStatConnector : public SourceConnector {
 
  protected:
   explicit ProcStatConnector(std::string_view name) : SourceConnector(name, kTables) {}
-  Status InitImpl() override;
+  Status InitImpl(bpf_tools::BCCWrapper *) override;
   void TransferDataImpl(ConnectorContext* ctx) override;
 
   Status StopImpl() override { return Status::OK(); }

@@ -89,8 +89,10 @@ enum TraceMode : int32_t {
   OnForNewerKernel = 2,
 };
 
-class SocketTraceConnector : public SourceConnector, public bpf_tools::BCCWrapper {
+class SocketTraceConnector : public SourceConnector {
  public:
+  bpf_tools::BCCWrapper& BCC() { return *bcc_; }
+
   static constexpr std::string_view kName = "socket_tracer";
   static constexpr auto kTables =
       MakeArray(kConnStatsTable, kHTTPTable, kMySQLTable, kCQLTable, kPGSQLTable, kDNSTable,
@@ -116,7 +118,7 @@ class SocketTraceConnector : public SourceConnector, public bpf_tools::BCCWrappe
     return std::unique_ptr<SocketTraceConnector>(new SocketTraceConnector(name));
   }
 
-  Status InitImpl() override;
+  Status InitImpl(bpf_tools::BCCWrapper*) override;
   Status StopImpl() override;
   void InitContextImpl(ConnectorContext* ctx) override;
   void TransferDataImpl(ConnectorContext* ctx) override;
@@ -229,6 +231,8 @@ class SocketTraceConnector : public SourceConnector, public bpf_tools::BCCWrappe
 
   // Writes data event to the specified output file.
   void WriteDataEvent(const SocketDataEvent& event);
+
+  bpf_tools::BCCWrapper* bcc_ = nullptr;
 
   ConnTrackersManager conn_trackers_mgr_;
 

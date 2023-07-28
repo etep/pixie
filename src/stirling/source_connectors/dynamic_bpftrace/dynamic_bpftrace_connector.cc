@@ -217,7 +217,7 @@ Status CheckOutputFields(const std::vector<bpftrace::Field>& fields,
 
 }  // namespace
 
-Status DynamicBPFTraceConnector::InitImpl() {
+Status DynamicBPFTraceConnector::InitImpl(bpf_tools::BCCWrapper*) {
   sampling_freq_mgr_.set_period(kSamplingPeriod);
   push_freq_mgr_.set_period(kPushPeriod);
 

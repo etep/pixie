@@ -52,7 +52,7 @@ class JVMStatsConnector : public SourceConnector {
     return std::unique_ptr<SourceConnector>(new JVMStatsConnector(name));
   }
 
-  Status InitImpl() override;
+  Status InitImpl(bpf_tools::BCCWrapper*) override;
   Status StopImpl() override { return Status::OK(); }
 
   void TransferDataImpl(ConnectorContext* ctx) override;

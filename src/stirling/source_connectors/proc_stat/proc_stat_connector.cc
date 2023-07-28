@@ -31,7 +31,7 @@ using px::system::ProcPath;
 // Temporary data source for M2. We plan to remove this data source
 // once the ebpf version is available.
 // Using data from /proc/stat
-Status ProcStatConnector::InitImpl() {
+Status ProcStatConnector::InitImpl(bpf_tools::BCCWrapper*) {
   sampling_freq_mgr_.set_period(kSamplingPeriod);
   push_freq_mgr_.set_period(kPushPeriod);
   const auto proc_stat_path = ProcPath("stat");
