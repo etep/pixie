@@ -81,7 +81,7 @@ bool FDResolver::Update() {
 
 std::optional<std::string_view> FDResolver::InferFDLink(
     std::chrono::time_point<std::chrono::steady_clock> time) {
-  if (time > first_timestamp_ && time < last_timestamp_) {
+  if (time > first_timestamp_ && time <= last_timestamp_) {
     return fd_link_;
   }
   return {};

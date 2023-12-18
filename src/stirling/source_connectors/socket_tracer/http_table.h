@@ -43,6 +43,8 @@ constexpr DataElement kHTTPElements[] = {
         canonical_data_elements::kUPID,
         canonical_data_elements::kRemoteAddr,
         canonical_data_elements::kRemotePort,
+        canonical_data_elements::kLocalAddr,
+        canonical_data_elements::kLocalPort,
         canonical_data_elements::kTraceRole,
         {"major_version", "HTTP major version, can be 1 or 2",
          types::DataType::INT64,

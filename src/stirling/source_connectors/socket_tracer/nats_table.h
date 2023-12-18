@@ -31,6 +31,8 @@ constexpr DataElement kNATSElements[] = {
         canonical_data_elements::kUPID,
         canonical_data_elements::kRemoteAddr,
         canonical_data_elements::kRemotePort,
+        canonical_data_elements::kLocalAddr,
+        canonical_data_elements::kLocalPort,
         canonical_data_elements::kTraceRole,
         {"cmd", "The name of the command.",
          types::DataType::STRING, types::SemanticType::ST_NONE, types::PatternType::GENERAL},
